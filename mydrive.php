@@ -1,18 +1,6 @@
 <?php
 session_start(); // Ensure this is the very first line with no whitespace above
-
-
-// Database connection parameters
-$servername = "localhost";
-$username = "root";
-$password = "capstone2425";
-$dbname = "greyhoundhub";
-
-// Create database connection
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require "config.php";
 // Handle file upload and redirect logic
 // Set the base directory path
 $base_directory = '/Volumes/creative/categorizesample';
@@ -145,8 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
     }
 }
 
-// Close the database connection
-$conn->close();
+
 ?>
 
 

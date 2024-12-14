@@ -1,103 +1,85 @@
 <?php
-session_start(); // Ensure this is the very first line with no whitespace above
-
-// Database connection parameters
-$servername = "localhost";
-$username = "root";
-$password = "capstone2425";
-$dbname = "greyhoundhub";
-
-// Create database connection
-$conn = new mysqli($servername, $username, $password, $dbname);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+require 'head.php';
+require 'login-check.php';
+require 'config.php';
 
 // Set the base directory path
-$base_directory = '/Volumes/creative/categorizesample/FU-Events';
+$base_directory = '/Volumes/creative/greyhoundhub/FU_Events';
 $current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
+
+// Function to convert file path to URL
+function convertFilePathToURL($filePath) {
+    $baseDirectory = '/Volumes';
+    $baseURL = 'http://172.16.152.45:8000';
+    return str_replace($baseDirectory, $baseURL, $filePath);
+}
 
 // Function to fetch recent file paths
 function getRecentFilePaths($conn) {
-    // Define allowed file extensions
     $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mp3', 'wav', 'mov'];
-
-    // Create a string of allowed extensions for SQL IN clause
     $allowedExtensionsSQL = "'" . implode("', '", $allowedExtensions) . "'";
-
-    // Update the query to filter based on file extensions and order by timestamp
     $query = "SELECT item_name, item_type, filepath, timestamp 
               FROM recent 
               WHERE item_type = 'file' AND LOWER(SUBSTRING_INDEX(filepath, '.', -1)) IN ($allowedExtensionsSQL)
               ORDER BY timestamp DESC
               LIMIT 10";
-
     $result = $conn->query($query);
     if (!$result) {
         die("Query Failed: " . $conn->error);
     }
-
     return $result->fetch_all(MYSQLI_ASSOC);
 }
 
 // Fetch recent files
 $recentFiles = getRecentFilePaths($conn);
 
-// Close the database connection
-$conn->close();
+// Function to convert timestamp to Philippine Time (PHT) in 12-hour format
+function convertTimestamp($timestamp) {
+    $dateTime = new DateTime($timestamp, new DateTimeZone('UTC'));
+    $dateTime->setTimezone(new DateTimeZone('Asia/Manila'));
+    return $dateTime->format('Y-m-d h:i:s A');
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
-    <meta content="width=device-width, initial-scale=1.0" name="viewport">
-
-    <title>Greyhound Hub</title>
-    <meta content="" name="description">
-    <meta content="" name="keywords">
-
-    <!-- Favicons -->
-    <link href="assets/img/logoo.png" rel="icon">
-    <link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon">
-
-    <!-- Google Fonts -->
-    <link href="https://fonts.gstatic.com" rel="preconnect">
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
-
-    <!-- Vendor CSS Files -->
+    <title>Recent Files</title>
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-    <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
-    <link href="assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet">
-    <link href="assets/vendor/quill/quill.snow.css" rel="stylesheet">
-    <link href="assets/vendor/quill/quill.bubble.css" rel="stylesheet">
-    <link href="assets/vendor/remixicon/remixicon.css" rel="stylesheet">
-    <link href="assets/vendor/simple-datatables/style.css" rel="stylesheet">
-
-    <!-- Template Main CSS File -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
-</head>
-
-<body>
-
-<?php include 'header.php'; ?>
-<?php include 'sidebar.php'; ?>
+    <link href="https://cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css" rel="stylesheet">
+      <!-- Include Bootstrap, DataTables, and FontAwesome -->
+      <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        .grid-view {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
         }
-        table {
+        .grid-view .grid-item {
+            display: flex;
+            flex-direction: column;
+            width: 23%;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .grid-view img, .grid-view video {
             width: 100%;
-            border-collapse: collapse;
+            max-height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-bottom: 10px;
         }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border: 1px solid #ddd;
-        }
-        th {
-            background-color: #f2f2f2;
+        .grid-view .file-info {
+            text-align: center;
         }
         #file-preview-overlay {
             position: fixed;
@@ -109,174 +91,212 @@ $conn->close();
             display: none;
             justify-content: center;
             align-items: center;
-            z-index: 1000;
+            z-index: 1050;
         }
-        .preview-media {
-            max-width: 90vw;
-            max-height: 90vh;
-            object-fit: contain;
+        #file-preview-content {
+            max-width: 80%;
+            max-height: 80%;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        .hidden { 
-            display: none; /* Hide elements with this class */
+        #file-preview-close {
+        position: absolute;
+                top: 20px; /* Adjusted position from the top */
+                left: 20px; /* Adjusted position from the left */
+                font-size: 2rem; /* Font size for the close button */
+                color: white; /* Color set to white for visibility */
+                background: none; /* No background */
+                border: none; /* No border */
+                cursor: pointer; /* Pointer cursor on hover */
+                z-index: 1100; /* Ensure it’s above everything else */
+                margin-top: 40px; /* Adjust this value as needed */
+    }
+        .view-buttons {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+        .view-buttons .btn-group {
+            display: flex;
+            border: 1px solid #ccc;
+            border-radius: 50px;
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+        .view-buttons .btn {
+            border: none;
+            background: none;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+        }
+        .view-buttons .btn.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .view-buttons .btn i {
+            font-size: 18px;
+        }
+        #fileTable img, #fileTable video {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 5px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
+<?php include 'header.php'; ?>
+<?php include 'sidebar.php'; ?>
 
 <main id="main" class="main">
     <div class="pagetitle">
         <h1>Recent Files</h1>
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="home.php">Home</a></li>
-            <li class="breadcrumb-item active">My Folder</li>
+            <li class="breadcrumb-item active">Recent Files</li>
         </ol>
     </div>
 
-    <div class="container">
-        <h3 class="hidden">Current Directory: <?php echo htmlspecialchars($current_directory); ?></h3> <!-- Hidden element -->
-        <h3 class="hidden">Recent Files</h3> <!-- Hidden element -->
-        <table class="table">
+    <div class="view-buttons">
+        <div class="btn-group">
+            <button class="btn active" onclick="switchToListView()" id="listViewBtn">
+                <i class="fas fa-list"></i>
+            </button>
+            <button class="btn" onclick="switchToGridView()" id="gridViewBtn">
+                <i class="fas fa-th"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="fileContainer" class="list-view table-responsive">
+        <table class="table table-hover table-striped" id="fileTable">
             <thead>
                 <tr>
-                    <th>File/Folder Name</th>
+                    <th>Thumbnail</th>
+                    <th>File Name</th>
                     <th>Type</th>
-                    <th>Filepath</th>
                     <th>Timestamp</th>
-                    <th>Actions</th>
                 </tr>
             </thead>
-            <tbody id="recent-files-body">
-                <?php if (empty($recentFiles)): ?>
+            <tbody>
+                <?php foreach ($recentFiles as $file): ?>
+                    <?php 
+                    $fileUrl = convertFilePathToURL($file['filepath']);
+                    $fileType = pathinfo($file['filepath'], PATHINFO_EXTENSION);
+                    $localTimestamp = convertTimestamp($file['timestamp']);
+                    ?>
                     <tr>
-                        <td colspan="5">No recent files or folders found.</td>
+                        <td>
+                            <?php if (preg_match('/(jpg|jpeg|png|gif)$/i', $fileType)): ?>
+                                <img src="<?php echo $fileUrl; ?>" onclick="openPreviewModal('<?php echo $fileUrl; ?>', '<?php echo $fileType; ?>')">
+                            <?php elseif (preg_match('/(mp4|mov)$/i', $fileType)): ?>
+                                <video src="<?php echo $fileUrl; ?>" onclick="openPreviewModal('<?php echo $fileUrl; ?>', '<?php echo $fileType; ?>')"></video>
+                            <?php else: ?>
+                                <span>No Preview</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <a href="javascript:void(0);" onclick="openPreviewModal('<?php echo $fileUrl; ?>', '<?php echo $fileType; ?>')">
+                                <?php echo htmlspecialchars($file['item_name']); ?>
+                            </a>
+                        </td>
+                        <td><?php echo htmlspecialchars($fileType); ?></td>
+                        <td><?php echo htmlspecialchars($localTimestamp); ?></td>
                     </tr>
-                <?php else: ?>
-                    <?php foreach ($recentFiles as $item): ?>
-                        <tr>
-                            <td>
-                                <a href="javascript:void(0);" 
-                                   class="file-folder-link" 
-                                   data-type="<?php echo htmlspecialchars($item['item_type']); ?>" 
-                                   data-path="<?php echo htmlspecialchars($item['filepath']); ?>">
-                                   <?php echo htmlspecialchars($item['item_name']); ?>
-                                </a>
-                            </td>
-                            <td><?php echo htmlspecialchars($item['item_type']); ?></td>
-                            <td><?php echo htmlspecialchars($item['filepath']); ?></td>
-                            <td><?php echo htmlspecialchars($item['timestamp']); ?></td>
-                            <td>
-                                <?php if ($item['item_type'] === 'file'): ?>
-                                    <button class="btn btn-info" onclick="openModal('<?php echo htmlspecialchars(str_replace('/Volumes/creative/categorizesample', '/creative/categorizesample', $item['filepath'])); ?>')">Preview</button>
-                                <?php else: ?>
-                                    <button class="btn btn-secondary" disabled>Preview</button>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+                <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+
+    <div id="fileGrid" class="grid-view" style="display: none;">
+        <?php foreach ($recentFiles as $file): ?>
+            <?php 
+            $fileUrl = convertFilePathToURL($file['filepath']);
+            $fileType = pathinfo($file['filepath'], PATHINFO_EXTENSION);
+            ?>
+            <div class="grid-item">
+                <?php if (preg_match('/(jpg|jpeg|png|gif)$/i', $fileType)): ?>
+                    <img src="<?php echo $fileUrl; ?>" alt="<?php echo htmlspecialchars($file['item_name']); ?>" onclick="openPreviewModal('<?php echo $fileUrl; ?>', '<?php echo $fileType; ?>')">
+                <?php elseif (preg_match('/(mp4|mov)$/i', $fileType)): ?>
+                    <video src="<?php echo $fileUrl; ?>" controls onclick="openPreviewModal('<?php echo $fileUrl; ?>', '<?php echo $fileType; ?>')"></video>
+                <?php else: ?>
+                    <p>Preview not available</p>
+                <?php endif; ?>
+                <div class="file-info">
+                    <p><?php echo htmlspecialchars($file['item_name']); ?></p>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
 </main>
 
-<!-- File Preview Section -->
 <div id="file-preview-overlay">
-    <button id="close-preview-btn" onclick="closePreview()">&#10005;</button>
+    <button id="file-preview-close" onclick="closePreview()">&#10005;</button>
     <div id="file-preview-content"></div>
 </div>
 
-<!-- Vendor JS Files -->
-<script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
 <script>
-    // Function to open the preview overlay and display the image or video
-    function openModal(fileUrl) {
-        var overlay = document.getElementById("file-preview-overlay");
-        var content = document.getElementById("file-preview-content");
-        content.innerHTML = ""; // Clear previous content
-
-        var img = document.createElement("img");
-        img.src = fileUrl;
-        img.className = "preview-media";
-
-        img.onload = function() {
-            content.appendChild(img); // Only add the image if it loads successfully
-            overlay.style.display = "flex"; // Show the overlay
-        };
-
-        img.onerror = function() {
-            overlay.style.display = "none"; // Hide the overlay if image fails to load
-        };
-
-        // If the file is a video, create a video element
-        var ext = fileUrl.split('.').pop().toLowerCase(); // Get file extension
-        if (ext.match(/(mp4|mp3|wav|mov)$/i)) {
-            var video = document.createElement("video");
-            video.src = fileUrl;
-            video.className = "preview-media";
-            video.controls = true;
-            content.appendChild(video);
-            overlay.style.display = "flex"; // Show the overlay
-        }
-    }
-
-    // Function to close the preview overlay
-    function closePreview() {
-        var overlay = document.getElementById("file-preview-overlay");
-        overlay.style.display = "none"; // Hide the overlay
-    }
-
-    // Handle double-click for file/folder links
-    document.querySelectorAll('.file-folder-link').forEach(function(link) {
-        link.addEventListener('dblclick', function() {
-            var type = this.getAttribute('data-type');
-            var path = this.getAttribute('data-path');
-            
-            if (type === 'folder') {
-                window.location.href = '?dir=' + encodeURIComponent(path); // Navigate to the folder
-            } else if (type === 'file') {
-                openModal(path); // Open preview for the file
-            }
-        });
+$(document).ready(function() {
+    $('#fileTable').DataTable({
+        "order": [[3, "desc"]], // Sort by the 4th column (timestamp) descending
+        "pageLength": 5,        // Default number of rows per page
+        "lengthMenu": [5, 10, 25, 50, 100], // Options for rows per page
+        "dom": 'lfrtip'         // Show the page length dropdown (l), search box (f), and pagination controls (p)
     });
+});
 
-    // AJAX Function to fetch recent files
-    function fetchRecentFiles() {
-        // Fetch recent files directly from the server
-        fetch(window.location.href + '?fetch_recent_files=true') // Use current URL with query
-            .then(response => response.json())
-            .then(data => {
-                const recentFilesBody = document.getElementById('recent-files-body');
-                recentFilesBody.innerHTML = ''; // Clear existing content
 
-                if (data.length === 0) {
-                    recentFilesBody.innerHTML = '<tr><td colspan="5">No recent files or folders found.</td></tr>';
-                } else {
-                    data.forEach(item => {
-                        const row = `<tr>
-                            <td>
-                                <a href="javascript:void(0);" class="file-folder-link" data-type="${item.item_type}" data-path="${item.filepath}">
-                                    ${item.item_name}
-                                </a>
-                            </td>
-                            <td>${item.item_type}</td>
-                            <td>${item.filepath}</td>
-                            <td>${item.timestamp}</td>
-                            <td>
-                                <button class="btn btn-info" onclick="openModal('${item.filepath}')">Preview</button>
-                            </td>
-                        </tr>`;
-                        recentFilesBody.innerHTML += row;
-                    });
-                }
-            })
-            .catch(error => console.error('Error fetching recent files:', error));
+function openPreviewModal(fileUrl, fileType) {
+    const overlay = document.getElementById('file-preview-overlay');
+    const content = document.getElementById('file-preview-content');
+    content.innerHTML = "";
+
+    if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
+        const img = document.createElement("img");
+        img.src = fileUrl;
+        img.style.maxWidth = "100%";
+        img.style.maxHeight = "100%";
+        content.appendChild(img);
+    } else if (fileType.match(/(mp4|mov)$/i)) {
+        const video = document.createElement("video");
+        video.src = fileUrl;
+        video.controls = true;
+        video.style.maxWidth = "100%";
+        video.style.maxHeight = "100%";
+        content.appendChild(video);
+    } else {
+        content.innerHTML = "<p>Preview not available for this file type.</p>";
     }
 
-    // Polling to fetch recent files every 5 seconds
-    setInterval(fetchRecentFiles, 5000);
-</script>
+    overlay.style.display = "flex";
+}
 
+function closePreview() {
+    document.getElementById('file-preview-overlay').style.display = "none";
+}
+
+function switchToListView() {
+    document.getElementById('fileContainer').style.display = "block";
+    document.getElementById('fileGrid').style.display = "none";
+    document.getElementById('listViewBtn').classList.add("active");
+    document.getElementById('gridViewBtn').classList.remove("active");
+}
+
+function switchToGridView() {
+    document.getElementById('fileContainer').style.display = "none";
+    document.getElementById('fileGrid').style.display = "flex";
+    document.getElementById('gridViewBtn').classList.add("active");
+    document.getElementById('listViewBtn').classList.remove("active");
+}
+</script>
+<?php require 'footer.php'; ?>
 </body>
 </html>
-

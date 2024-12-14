@@ -1,3 +1,6 @@
+<?php 
+require 'login-check.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -68,20 +71,6 @@
                 </a>
             </div>
         </div>
-
-        <!-- Suggested Files Section with List and Grid Toggle -->
-        <div class="suggested-files-section">
-            <div class="d-flex justify-content-between align-items-center mt-3 mb-4">
-                <h5>Suggested files</h5>
-                <div class="view-toggle">
-                    <button id="list-view-btn" class="btn-toggle active">
-                        <i class="bi bi-list"></i>
-                    </button>
-                    <button id="grid-view-btn" class="btn-toggle">
-                        <i class="bi bi-grid-3x3-gap-fill"></i>
-                    </button>
-                </div>
-            </div>
 
             <!-- List View -->
             <div class="suggested-files-table" id="list-view">

@@ -139,7 +139,7 @@ h6 {
   font-size: 24px;
   margin-bottom: 0;
   font-weight: 600;
-  color: #012970;
+  color: black;
 }
 
 /*--------------------------------------------------------------
@@ -152,7 +152,7 @@ h6 {
   right: 15px;
   bottom: 15px;
   z-index: 99999;
-  background: #4154f1;
+  background: #9A1B2F;
   width: 40px;
   height: 40px;
   border-radius: 4px;
@@ -759,7 +759,7 @@ h6 {
   align-items: center;
   font-size: 15px;
   font-weight: 600;
-  color: #4154f1;
+  color: #9A1B2F;
   transition: 0.3;
   background: #f6f9ff;
   padding: 10px 15px;
@@ -769,11 +769,11 @@ h6 {
 .sidebar-nav .nav-link i {
   font-size: 16px;
   margin-right: 10px;
-  color: #4154f1;
+  color: #9A1B2F;
 }
 
 .sidebar-nav .nav-link.collapsed {
-  color: #012970;
+  color: #6c757d;
   background: #fff;
 }
 
@@ -782,12 +782,12 @@ h6 {
 }
 
 .sidebar-nav .nav-link:hover {
-  color: #4154f1;
+  color: #9A1B2F;
   background: #f6f9ff;
 }
 
 .sidebar-nav .nav-link:hover i {
-  color: #4154f1;
+  color: #9A1B2F;
 }
 
 .sidebar-nav .nav-link .bi-chevron-down {
@@ -1643,10 +1643,18 @@ h6 {
   text-align: center;
 }
 
-/* Container to hold the buttons together and align them to the right */
+
 .button-group {
   display: flex;
   justify-content: flex-end; /* Aligns the buttons to the right */
+}
+
+/* Divider between buttons */
+.button-divider {
+  width: 1px;
+  background-color: #ccc; /* Light gray divider */
+  height: 40px; /* Match button height */
+  align-self: center; /* Align vertically */
 }
 
 /* List view button */
@@ -1659,7 +1667,6 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: -1px; /* Remove the gap between buttons */
   position: relative; /* Positioning context for hover effects */
   z-index: 1; /* Ensure it's above the next button */
   cursor: pointer; /* Pointer cursor on hover */
@@ -1675,7 +1682,6 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: -1px; /* Remove the gap between buttons */
   position: relative; /* Positioning context for hover effects */
   z-index: 2; /* Ensure it's above the previous button */
   cursor: pointer; /* Pointer cursor on hover */
@@ -1686,14 +1692,15 @@ h6 {
   background-color: #d0e7ff; /* Slightly darker shade of blue on hover */
 }
 
-
 #list-view-btn i, #grid-view-btn i {
   color: #333; /* Dark gray icon color */
   font-size: 18px; /* Slightly larger icon */
 }
 
-#list-view-btn:hover, #grid-view-btn:hover {
-  background-color: #d9e9ff; /* Slightly darker blue on hover */
+/* Active button state */
+#list-view-btn.active, #grid-view-btn.active {
+  background-color: #b3d4ff; /* Highlight active button */
+  border-color: #999; /* Darker border for active state */
 }
 
 #file-list img {
@@ -1914,3 +1921,112 @@ h6 {
       margin-top: -40px;
   }
 }
+
+.main-container {
+  margin: 20px;
+  font-size: 14px;
+  color: #202124;
+}
+
+.pagetitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.pagetitle h1 {
+  font-size: 1.75rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.filters button {
+  background-color: #f1f3f4;
+  border: 1px solid #dcdcdc;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.filters button:hover {
+  background-color: #e5e5e5;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+thead {
+  background-color: #f8f9fa;
+}
+
+th, td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  font-size: 14px;
+  font-weight: bold;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+td {
+  font-size: 14px;
+  color: #202124;
+}
+
+td a {
+  color: #1a73e8;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+td a:hover {
+  text-decoration: underline;
+}
+
+tr:hover {
+  background-color: #f1f3f4;
+}
+
+.actions button {
+  padding: 6px 12px;
+  font-size: 14px;
+  color: #fff;
+  background-color: #1967d2;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.actions button:hover {
+  background-color: #1558b2;
+}
+
+.file-icon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-icon i {
+  font-size: 20px;
+  color: #757575;
+}
+
+.file-details {
+  font-size: 14px;
+}
+

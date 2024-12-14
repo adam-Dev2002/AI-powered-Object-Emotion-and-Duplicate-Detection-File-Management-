@@ -20,32 +20,18 @@ switch ($currentPage) {
     case 'home':
         $pageTitle = 'Home';
         break;
+    case 'ifound':
+        $pageTitle = 'ifound';
+        break;
     default:
         $pageTitle = 'Files'; // Default title
         break;
 }
 
 
-// Initialize results array
-$aiSearchResults = [];
 
-// Check if the form is submitted
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && !empty($_POST['searchTerm'])) {
-    // Get the search term from the form
-    $searchTerm = escapeshellarg($_POST['searchTerm']); // Sanitize input for shell
 
-    // Run the Python script with the search term
-    $command = "python3 yolo_detect.py " . escapeshellarg($searchTerm);
-    $output = shell_exec($command);
-
-    // Decode JSON output from yolo_detect.py
-    $aiSearchResults = json_decode($output, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        echo "Error decoding JSON from yolo_detect.py: " . json_last_error_msg();
-        $aiSearchResults = [];
-    }
-}
+    
 
 ?>
 
@@ -66,6 +52,57 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !empty($_POST['searchTerm'])) {
         .grid-view {
             display: none; /* Hide grid view by default */
         }
+
+
+        /* General table styling for a clean, borderless look */
+.table {
+    border-collapse: collapse; /* Removes spacing between cells */
+    width: 100%; /* Full-width table */
+}
+
+.table th,
+.table td {
+    border: none; /* Remove all borders */
+    padding: 8px 12px; /* Add consistent padding */
+    text-align: left; /* Align text to the left */
+}
+
+.table thead th {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: #6c757d; /* Subtle gray for headers */
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa; /* Add hover effect for rows */
+}
+
+/* Styling for the ellipsis button */
+.action-icon-btn {
+    background: none; /* No background */
+    border: none; /* No border */
+    padding: 0; /* Remove padding */
+    margin: 0; /* Remove margin */
+    cursor: pointer; /* Pointer cursor for interactivity */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-icon-btn svg {
+    color: #5f6368; /* Subtle gray for the icon */
+    transition: color 0.2s ease;
+}
+
+.action-icon-btn:hover svg {
+    color: #202124; /* Slightly darker gray on hover */
+}
+
+.action-icon-btn:focus {
+    outline: none; /* Remove focus outline */
+}
+
     </style>
 </head>
 
@@ -81,26 +118,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !empty($_POST['searchTerm'])) {
     </div><!-- End Page Title -->
 
 
-     <!-- Search Form -->
-     <form method="POST" action="">
-        <div class="input-group mb-3">
-            <input type="text" name="searchTerm" class="form-control" placeholder="Search for objects (e.g., 'car', 'person')" required>
-            <div class="input-group-append">
-                <button class="btn btn-primary" type="submit">Search</button>
-            </div>
-        </div>
-    </form>
+  
 
 
 <!-- Buttons to switch between list and grid views -->
 <div class="button-group">
     <div class="d-flex justify-content-end">
         <!-- List Button -->
-        <button class="btn mx-2 p-2" onclick="toggleView('list')" id="list-view-btn">
+        <button class="btn mx-0 p-2" onclick="toggleView('list')" id="list-view-btn">
             <i class="fas fa-bars"></i> <!-- Font Awesome List Icon -->
         </button>
         <!-- Grid Button -->
-        <button class="btn p-2" onclick="toggleView('grid')" id="grid-view-btn">
+        <button class="btn mx-0 p-2" onclick="toggleView('grid')" id="grid-view-btn">
             <i class="fas fa-th"></i> <!-- Font Awesome Grid Icon -->
         </button>
     </div>
@@ -128,60 +157,88 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !empty($_POST['searchTerm'])) {
                         </thead>
                         <tbody>
                         <?php
-                        // Set the base directory path
-                        $base_directory = '/Volumes/creative/';
-                        $current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
+// Set the base directory path
+$base_directory = '/Volumes/creative/';
+$current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
 
-                        // Ensure the current directory is valid
-                        if (!is_dir($current_directory) || strpos(realpath($current_directory), realpath($base_directory)) !== 0) {
-                            $current_directory = $base_directory; // Default to base directory if invalid
-                        }
+// Ensure the current directory is valid
+if (!is_dir($current_directory) || strpos(realpath($current_directory), realpath($base_directory)) !== 0) {
+    $current_directory = $base_directory; // Default to base directory if invalid
+}
 
-                        // If not in the base directory, display a back button
-                        if ($current_directory !== $base_directory) {
-                            $parent_directory = dirname($current_directory);
-                            echo '<tr><td colspan="7"><a href="?dir=' . urlencode($parent_directory) . '">← Back to ' . htmlspecialchars(basename($parent_directory)) . '</a></td></tr>';
-                        }
+// If not in the base directory, display a back button
+if ($current_directory !== $base_directory) {
+    $parent_directory = dirname($current_directory);
+    echo '<tr><td colspan="7"><a href="?dir=' . urlencode($parent_directory) . '">← Back to ' . htmlspecialchars(basename($parent_directory)) . '</a></td></tr>';
+}
 
-                        // Get all items in the current directory
-                        $items = scandir($current_directory);
-                        $items = array_diff($items, ['.', '..']); // Remove '.' and '..' from the listing
+// Get all items in the current directory
+$items = scandir($current_directory);
+$items = array_diff($items, ['.', '..']); // Remove '.' and '..' from the listing
 
-                        foreach ($items as $item) {
-                            $item_path = $current_directory . '/' . $item;
-                            $is_dir = is_dir($item_path); // Check if the item is a directory
-                        
-                            // Create the correct URL for the file or folder
-                            $web_url = str_replace($base_directory, '/creative/', $item_path);
-                        
-                            if ($is_dir) {
-                                // For folders
-                                echo '<tr>';
-                                echo '<td><input type="checkbox" class="rowCheckbox"></td>';
-                                echo '<td><a href="?dir=' . urlencode($item_path) . '">' . htmlspecialchars($item) . '</a></td>';
-                                echo '<td>Folder</td>';
-                                echo '<td>Unknown</td>';
-                                echo '<td>' . htmlspecialchars($item_path) . '</td>';
-                                echo '<td>Creative</td>';
-                                echo '<td><button class="btn btn-info" disabled>View</button></td>';
-                                echo '</tr>';
-                            } else {
-                                // For files, check the file extension
-                                $file_extension = strtolower(pathinfo($item, PATHINFO_EXTENSION));
-                        
-                                // Use the modal for file previews and add data attributes
-                                echo '<tr>';
-                                echo '<td><input type="checkbox" class="rowCheckbox"></td>';
-                                echo '<td><a href="javascript:void(0);" class="file-link" data-url="' . htmlspecialchars($web_url) . '" data-type="' . $file_extension . '">' . htmlspecialchars($item) . '</a></td>';
-                                echo '<td>File</td>';
-                                echo '<td>Unknown</td>';
-                                echo '<td>' . htmlspecialchars($item_path) . '</td>';
-                                echo '<td>Creative</td>';
-                                echo '<td><button class="btn btn-info" onclick="openModal(\'' . htmlspecialchars($web_url) . '\', \'' . $file_extension . '\')">Preview</button></td>';
-                                echo '</tr>';
-                            }
-                        }
-                        ?>
+foreach ($items as $item) {
+    $item_path = $current_directory . '/' . $item;
+    $is_dir = is_dir($item_path); // Check if the item is a directory
+
+    // Create the correct URL for the file or folder
+    $web_url = str_replace($base_directory, '/creative/', $item_path);
+
+    if ($is_dir) {
+        // For folders
+        echo '<tr>';
+        echo '<td><input type="checkbox" class="rowCheckbox"></td>';
+        echo '<td><a href="?dir=' . urlencode($item_path) . '">' . htmlspecialchars($item) . '</a></td>';
+        echo '<td>Folder</td>';
+        echo '<td>Unknown</td>';
+        echo '<td>' . htmlspecialchars($item_path) . '</td>';
+        echo '<td>Creative</td>';
+        echo '<td>
+            <!-- Dropdown for Ellipsis -->
+            <div class="dropdown">
+                <button class="btn action-icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots-vertical" viewBox="0 0 16 16">
+                        <path d="M9.5 13a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>
+                    </svg>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="handleAction(\'copy\', \'' . htmlspecialchars($item_path) . '\')">Copy</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="handleRename(\'' . htmlspecialchars($item_path) . '\')">Rename</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="handleAction(\'download\', \'' . htmlspecialchars($item_path) . '\')">Download</a></li>
+                </ul>
+            </div>
+        </td>';
+        echo '</tr>';
+    } else {
+        // For files, check the file extension
+        $file_extension = strtolower(pathinfo($item, PATHINFO_EXTENSION));
+
+        // Use the modal for file previews and add data attributes
+        echo '<tr>';
+        echo '<td><input type="checkbox" class="rowCheckbox"></td>';
+        echo '<td><a href="javascript:void(0);" class="file-link" data-url="' . htmlspecialchars($web_url) . '" data-type="' . $file_extension . '">' . htmlspecialchars($item) . '</a></td>';
+        echo '<td>File</td>';
+        echo '<td>Unknown</td>';
+        echo '<td>' . htmlspecialchars($item_path) . '</td>';
+        echo '<td>Creative</td>';
+        echo '<td>
+            <!-- Dropdown for Ellipsis -->
+            <div class="dropdown">
+                <button class="btn action-icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots-vertical" viewBox="0 0 16 16">
+                        <path d="M9.5 13a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>
+                    </svg>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="handleAction(\'copy\', \'' . htmlspecialchars($item_path) . '\')">Copy</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="handleRename(\'' . htmlspecialchars($item_path) . '\')">Rename</a></li>
+                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="handleAction(\'download\', \'' . htmlspecialchars($item_path) . '\')">Download</a></li>
+                </ul>
+            </div>
+        </td>';
+        echo '</tr>';
+    }
+}
+?>
                         </tbody>
                     </table>
                 </div>

@@ -2,7 +2,7 @@
 session_start();
 
 // Set the base directory path
-$base_directory = '/Volumes/creative/categorizesample';
+$base_directory = '/Volumes/creative/greyhoundhub';
 
 // Retrieve the folder name and current directory from the POST request
 $folderName = isset($_POST['folderName']) ? trim($_POST['folderName']) : '';
@@ -51,7 +51,7 @@ if (!empty($folderName) && strpos(realpath($currentDir), realpath($base_director
 
             // Close the statement and connection
             $stmt->close();
-            $conn->close();
+       
 
         } else {
             $_SESSION['alert'] = "Error: Could not create folder.";

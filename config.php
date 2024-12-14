@@ -3,7 +3,7 @@
 $servername = "localhost"; // or your server name
 $username = "root"; // your database username
 $password = "capstone2425"; // your database password
-$dbname = "greyhoundhub"; // your database name
+$dbname = "greyhound_creative"; // your database name
 
 // Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);

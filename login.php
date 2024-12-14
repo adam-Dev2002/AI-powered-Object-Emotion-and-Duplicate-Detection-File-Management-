@@ -18,8 +18,7 @@ $login_err = "";
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Include the database connection file
-include 'config.php'; // Assuming config.php has $conn for MySQL connection
+require "config.php";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_POST['employee_id']) && isset($_POST['password'])) {
@@ -79,19 +78,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $email_address = $userData['email_address'];
 
                 // Step 4: Save or update user details in the local database
-                $stmt = $conn->prepare("INSERT INTO user (employee_id, name, department, position, email_address) 
-                                         VALUES (?, ?, ?, ?, ?) 
-                                         ON DUPLICATE KEY UPDATE 
-                                         name = VALUES(name), 
-                                         department = VALUES(department), 
-                                         position = VALUES(position), 
-                                         email_address = VALUES(email_address)");
+                $stmt = $conn->prepare("
+                    INSERT INTO admin_users (employee_id, name, department, position, email_address) 
+                    VALUES (?, ?, ?, ?, ?) 
+                    ON DUPLICATE KEY UPDATE 
+                        name = VALUES(name), 
+                        department = VALUES(department), 
+                        position = VALUES(position), 
+                        email_address = VALUES(email_address)
+                ");
                 $stmt->bind_param("sssss", $inputID, $name, $department, $position, $email_address);
                 $stmt->execute();
                 $stmt->close();
 
+                // Step 5: Log the login action in admin_activity_logs
+                $action = 'login';
+                $details = "Admin user {$inputID} logged in.";
+                $timestamp = date("Y-m-d H:i:s");
+
+                $log_stmt = $conn->prepare("
+                    INSERT INTO admin_activity_logs (admin_id, action, details, timestamp) 
+                    VALUES (?, ?, ?, ?)
+                ");
+                $log_stmt->bind_param("isss", $inputID, $action, $details, $timestamp);
+                $log_stmt->execute();
+                $log_stmt->close();
+
                 // Redirect to home.php after successful login and data save
-                header("Location: recent.php");
+                header("Location: index.php");
                 exit();
             } else {
                 $login_err = "Error: Failed to retrieve user details.";
@@ -156,17 +170,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                                 <form class="row g-3 needs-validation" method="POST" novalidate>
                                     <div class="col-12">
-                                        <label for="yourEmployeeID" class="form-label">Employee ID</label>
                                         <div class="input-group has-validation">
                                             <span class="input-group-text" id="inputGroupPrepend">ID</span>
-                                            <input type="text" name="employee_id" class="form-control" id="yourEmployeeID" required>
+                                            <input type="text" name="employee_id" class="form-control" id="yourEmployeeID" placeholder="Employee ID" required>
                                             <div class="invalid-feedback">Please enter your employee ID.</div>
                                         </div>
                                     </div>
 
                                     <div class="col-12">
-                                        <label for="yourPassword" class="form-label">Password</label>
-                                        <input type="password" name="password" class="form-control" id="yourPassword" required>
+                                        <input type="password" name="password" class="form-control" id="yourPassword" placeholder="Password" required>
                                         <div class="invalid-feedback">Please enter your password!</div>
                                     </div>
 
@@ -194,3 +206,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <script src="assets/js/main.js"></script>
 </body>
 </html>
+
