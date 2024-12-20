@@ -10,6 +10,7 @@ import sys
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import time
+from deepface import DeepFace  # Added for emotion detection
 
 # Load YOLO models for detection, classification, and pose
 models = {
@@ -22,19 +23,27 @@ models = {
 CONFIDENCE_THRESHOLD = 0.1
 
 # AFP volume path
-AFP_VOLUME_PATH = '/Volumes/creative/greyhoundhub/FU_EVENTS/Dal-uy'
+AFP_VOLUME_PATH = '/Volumes/creative/Hara All About/HARA sa FU 2025/Photoshoot'
 
 
 # MySQL Database Connection
 def get_db_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="capstone2425",
-        database="greyhound_creative"
-    )
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="capstone2425",
+            database="greyhound_creative",
+            autocommit=True  # Ensure changes are saved permanently
+        )
+        return connection
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        sys.exit(1)
 
+# Initialize global database connection
 db = get_db_connection()
+
 
 # Supported file types
 image_extensions = {'jpg', 'jpeg', 'png', 'gif'}
@@ -66,35 +75,47 @@ def get_file_creation_date(filepath):
 def populate_missing_columns(file_id, filepath):
     """Populate missing columns in the database."""
     try:
-        with db.cursor() as cursor:
+        with db.cursor(dictionary=True) as cursor:
             # Check for missing metadata
-            cursor.execute("SELECT datecreated, filehash FROM files WHERE id = %s", (file_id,))
+            cursor.execute("""
+                SELECT datecreated, filehash, detected_objects, classification, pose, gesture, emotion 
+                FROM files WHERE id = %s
+            """, (file_id,))
             result = cursor.fetchone()
 
-            # Extract missing fields
-            datecreated, filehash = result
+            if not result:
+                print(f"Error: File with ID {file_id} not found.")
+                return
 
-            # Populate missing file creation date
+            # Extract missing fields
+            datecreated = result.get('datecreated')
+            filehash = result.get('filehash')
+            detected_objects = result.get('detected_objects')
+            classification = result.get('classification')
+            pose = result.get('pose')
+            gesture = result.get('gesture')
+            emotion = result.get('emotion')
+
+            # Populate missing creation date
             if not datecreated:
                 creation_date = get_file_creation_date(filepath)
                 if creation_date:
-                    cursor.execute(
-                        "UPDATE files SET datecreated = %s WHERE id = %s",
-                        (creation_date, file_id)
-                    )
+                    cursor.execute("UPDATE files SET datecreated = %s WHERE id = %s", (creation_date, file_id))
                     print(f"Populated datecreated for file ID {file_id}")
 
             # Populate missing filehash
             if not filehash:
                 new_filehash = calculate_filehash(filepath)
                 if new_filehash:
-                    cursor.execute(
-                        "UPDATE files SET filehash = %s WHERE id = %s",
-                        (new_filehash, file_id)
-                    )
+                    cursor.execute("UPDATE files SET filehash = %s WHERE id = %s", (new_filehash, file_id))
                     print(f"Populated filehash for file ID {file_id}")
 
-            # Commit changes
+            # Populate detected_objects, classification, pose, gesture, and emotion
+            file_type = filepath.split('.')[-1].lower()
+            if not detected_objects or not classification or not pose or not gesture or not emotion:
+                process_file(file_id, filepath, file_type)
+                print(f"Populated AI analysis results for file ID {file_id}")
+
             db.commit()
 
     except Exception as e:
@@ -105,7 +126,7 @@ def populate_missing_columns(file_id, filepath):
 
 # Ensure required columns in the database
 def ensure_required_columns():
-    required_columns = ['classification', 'pose', 'gesture', 'detected_objects', 'filehash']  # Added 'gesture'
+    required_columns = ['classification', 'pose', 'gesture', 'detected_objects', 'filehash', 'content_hash', 'emotion']
     try:
         with db.cursor() as cursor:
             for column in required_columns:
@@ -142,77 +163,59 @@ def calculate_filehash(filepath):
         return hasher.hexdigest()
     except Exception as e:
         print(f"Error hashing file {filepath}: {e}")
+
+
+
+
         return None
 
 # Check if file already exists in the database based on filehash
-def file_exists(filehash):
-    """Check if a file with the given hash already exists in the database."""
+def file_exists(filehash, content_hash):
+    """Check if a file with the same hash or AI content already exists."""
     try:
-        with db.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) FROM files WHERE filehash = %s", (filehash,))
-            return cursor.fetchone()[0] > 0
+        with db.cursor(dictionary=True) as cursor:
+            query = "SELECT * FROM files WHERE filehash = %s OR content_hash = %s"
+            cursor.execute(query, (filehash, content_hash))
+            duplicates = cursor.fetchall()
+            if duplicates:
+                print(f"Duplicate detected based on filehash or content analysis: {duplicates}")
+                return True
+        return False
     except Exception as e:
         print(f"Error checking file existence: {e}")
         return False
 
+
+
 # Improved Map keypoints to gestures with added accuracy
 def interpret_gesture(keypoints):
+    """Interpret gestures based on pose keypoints."""
     try:
         if len(keypoints) < 17:
             return "No clear gesture detected"
 
-        # Define key body parts for readability
-        nose = keypoints[0]
-        left_eye = keypoints[1]
-        right_eye = keypoints[2]
-        left_ear = keypoints[3]
-        right_ear = keypoints[4]
-        left_shoulder = keypoints[5]
-        right_shoulder = keypoints[6]
-        left_elbow = keypoints[7]
-        right_elbow = keypoints[8]
+        # Extract body keypoints
         left_wrist = keypoints[9]
         right_wrist = keypoints[10]
-        left_hip = keypoints[11]
-        right_hip = keypoints[12]
+        left_shoulder = keypoints[5]
+        right_shoulder = keypoints[6]
         left_knee = keypoints[13]
         right_knee = keypoints[14]
         left_ankle = keypoints[15]
         right_ankle = keypoints[16]
 
-        # Calculate distances and angles for gesture recognition
+        # Helper to calculate distance
         def distance(p1, p2):
             return ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
 
-        def angle(p1, p2, p3):
-            a = distance(p2, p3)
-            b = distance(p1, p3)
-            c = distance(p1, p2)
-            if a * b == 0:
-                return 0
-            return math.acos((a**2 + b**2 - c**2) / (2 * a * b)) * (180 / math.pi)
-
-        # Gesture: Walking
-        if (distance(left_ankle, right_ankle) > 50 and
-            distance(left_knee, right_knee) > 50 and
-            abs(left_ankle[1] - right_ankle[1]) > 20):
-            return "Walking detected"
-
-        # Gesture: Dancing
-        if (left_wrist[1] < left_shoulder[1] or right_wrist[1] < right_shoulder[1]):
-            return "Dancing detected"
-
-        # Gesture: Clapping
+        # Movement Detection Logic
+        if left_wrist[1] < left_shoulder[1] or right_wrist[1] < right_shoulder[1]:
+            return "Raising Hands"
         if distance(left_wrist, right_wrist) < 30:
-            return "Clapping detected"
-
-        # Gesture: Smiling
-        if (distance(left_eye, left_ear) > 20 and
-            distance(right_eye, right_ear) > 20 and
-            distance(left_eye, right_eye) > 30):
-            return "Smiling detected"
-
-        return "No significant gesture detected"
+            return "Clapping"
+        if abs(left_ankle[1] - right_ankle[1]) > 20:
+            return "Walking"
+        return "No significant movement detected"
     except Exception as e:
         print(f"Error interpreting gesture: {e}")
         return "Error during gesture interpretation"
@@ -267,20 +270,20 @@ def alert_and_handle_duplicates(filehash, filepath):
             print(f"Duplicate detected for {filepath}: Existing files:")
             for duplicate in duplicates:
                 print(f"- {duplicate['filepath']} (Uploaded on {duplicate['dateupload']})")
-            
-            # Continue scanning even if duplicates are found
-            return duplicates
-        return None
     except Exception as e:
-        print(f"Error checking for duplicates: {e}")
-        return None
+        print(f"Error checking duplicates: {e}")
+
 
 
 
 # Updated scan_and_process_directory function
 def scan_and_process_directory(directory):
     print("Scanning directory and processing files...")
-    start_time = time.time()  # Start time for the scan
+    start_time = time.time()
+
+    # Calculate total files for progress
+    total_files = sum([len(files) for _, _, files in os.walk(directory)])
+    processed_files = 0
 
     for root, _, files in os.walk(directory):
         for file in files:
@@ -294,12 +297,20 @@ def scan_and_process_directory(directory):
 
             # Calculate filehash
             filehash = calculate_filehash(filepath)
+            content_hash = None  # Initialize content_hash
+
             if not filehash:
                 print(f"Error: Unable to calculate filehash for {filepath}")
                 continue
 
+            # Check for duplicates
+            if file_exists(filehash, content_hash):
+                print(f"Duplicate detected: {filepath}")
+                alert_and_handle_duplicates(filehash, filepath)
+                continue
+
             try:
-                # Insert file into database or get its ID
+                # Insert file metadata into the database
                 size = get_file_size(filepath)
                 creation_date = get_file_creation_date(filepath)
                 sql = """
@@ -320,54 +331,81 @@ def scan_and_process_directory(directory):
                     file_id = cursor.lastrowid
                 db.commit()
 
-                # Populate missing metadata if needed
-                populate_missing_columns(file_id, filepath)
-
-                # Process file for AI (optional)
+                # Process the file and update AI results
                 process_file(file_id, filepath, filetype)
+
+                processed_files += 1
+                progress_percentage = (processed_files / total_files) * 100
+                print(f"Progress: {progress_percentage:.2f}%")
+                sys.stdout.flush()
 
             except Exception as e:
                 print(f"Error processing file '{file}': {e}")
 
     end_time = time.time()
-    print(f"Finished scanning. Time taken: {end_time - start_time} seconds.")
+    print(f"Finished scanning. Time taken: {end_time - start_time:.2f} seconds.")
 
+
+
+def calculate_content_hash(detected_objects, pose_gesture, emotions):
+    """Calculate a hash combining objects, pose gestures, and emotions."""
+    try:
+        content_string = json.dumps({
+            "objects": detected_objects,
+            "gesture": pose_gesture,
+            "emotions": emotions
+        }, sort_keys=True)
+        return hashlib.sha256(content_string.encode()).hexdigest()
+    except Exception as e:
+        print(f"Error calculating content hash: {e}")
+        return None
 
 # Process individual files
 def process_file(file_id, file_path, file_type):
     detected_objects = []
     classification = {}
     pose = {}
-    gesture = None  # New addition
-
-    if file_type in image_extensions:
-        try:
-            detected_objects = scan_image(file_path)
-            classification = classify_image(file_path)
-            pose_data = estimate_pose(file_path)
-            pose = pose_data.get("keypoints", [])
-            gesture = pose_data.get("gesture", "No gesture detected")
-        except Exception as e:
-            print(f"Error during AI processing for file '{file_path}': {e}")
-    elif file_type in video_extensions:
-        try:
-            detected_objects = scan_video(file_path)
-        except Exception as e:
-            print(f"Error during video processing for file '{file_path}': {e}")
-    else:
-        print(f"Unsupported file type: {file_type}")
-        return
+    gesture = "No gesture detected"
+    emotion = "Unknown"
+    content_hash = None  # Initialize content hash
 
     try:
-        # Update database with new data, including gesture
+        if file_type in image_extensions:
+            # Perform detection, classification, pose estimation, and emotion detection
+            detected_objects = scan_image(file_path) or []
+            classification = classify_image(file_path) or {}
+            pose_data = estimate_pose(file_path) or {}
+            pose = pose_data.get("keypoints", [])
+            gesture = pose_data.get("gesture", "No gesture detected")
+            emotion = detect_emotion(file_path) or "Unknown"
+
+            # Generate a content hash based on AI results
+            combined_content = json.dumps({
+                "detected_objects": detected_objects,
+                "classification": classification,
+                "pose": pose,
+                "gesture": gesture,
+                "emotion": emotion
+            })
+            content_hash = hashlib.sha256(combined_content.encode()).hexdigest()
+
+        elif file_type in video_extensions:
+            # Process video files for detection and emotion analysis
+            detected_objects = scan_video(file_path) or []
+            emotion = analyze_emotion_in_video(file_path) or "Neutral"
+
+            # Generate a content hash for video AI results
+            combined_content = json.dumps({
+                "detected_objects": detected_objects,
+                "emotion": emotion
+            })
+            content_hash = hashlib.sha256(combined_content.encode()).hexdigest()
+
+        # Update the database with the results
         sql = """
             UPDATE files
-            SET
-                detected_objects = %s,
-                classification = %s,
-                pose = %s,
-                gesture = %s,  -- New addition
-                last_scanned = %s
+            SET detected_objects = %s, classification = %s, pose = %s, 
+                gesture = %s, emotion = %s, content_hash = %s, last_scanned = %s
             WHERE id = %s
         """
         with db.cursor() as cursor:
@@ -375,14 +413,58 @@ def process_file(file_id, file_path, file_type):
                 json.dumps(detected_objects),
                 json.dumps(classification),
                 json.dumps(pose),
-                gesture,  # Add gesture here
+                gesture,
+                emotion,
+                content_hash,
                 datetime.now(),
                 file_id
             ))
         db.commit()
-        print(f"Updated file ID {file_id} with AI results.")
+        print(f"Updated file ID {file_id} with AI results and content_hash.")
     except Exception as e:
-        print(f"Error updating file ID {file_id}: {e}")
+        print(f"Error processing file ID {file_id}: {e}")
+
+
+
+def detect_emotion(file_path):
+    """Detect emotions in an image using DeepFace."""
+    try:
+        img = cv2.imread(file_path)
+        if img is None:
+            return "Unknown"
+        result = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False)
+        return result[0]['dominant_emotion']
+    except Exception as e:
+        print(f"Error detecting emotion in image: {e}")
+        return "Unknown"
+
+def analyze_emotion_in_video(video_path):
+    """Analyze dominant emotion from video frames."""
+    try:
+        cap = cv2.VideoCapture(video_path)
+        emotions_detected = []
+        frame_count = 0
+        frame_interval = 30  # Analyze every 30 frames
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_count % frame_interval == 0:
+                try:
+                    result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+                    emotions_detected.append(result[0]['dominant_emotion'])
+                except Exception:
+                    pass
+            frame_count += 1
+
+        cap.release()
+        return max(set(emotions_detected), key=emotions_detected.count, default="Neutral")
+    except Exception as e:
+        print(f"Error processing video emotion: {e}")
+        return "Neutral"
+
 
 
 # Monitor directory changes and trigger scan

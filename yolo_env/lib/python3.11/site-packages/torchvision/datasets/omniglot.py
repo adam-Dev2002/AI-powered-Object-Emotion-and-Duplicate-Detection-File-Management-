@@ -1,6 +1,5 @@
 from os.path import join
-from pathlib import Path
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple
 
 from PIL import Image
 
@@ -12,11 +11,11 @@ class Omniglot(VisionDataset):
     """`Omniglot <https://github.com/brendenlake/omniglot>`_ Dataset.
 
     Args:
-        root (str or ``pathlib.Path``): Root directory of dataset where directory
+        root (string): Root directory of dataset where directory
             ``omniglot-py`` exists.
         background (bool, optional): If True, creates dataset from the "background" set, otherwise
             creates from the "evaluation" set. This terminology is defined by the authors.
-        transform (callable, optional): A function/transform that takes in a PIL image
+        transform (callable, optional): A function/transform that  takes in an PIL image
             and returns a transformed version. E.g, ``transforms.RandomCrop``
         target_transform (callable, optional): A function/transform that takes in the
             target and transforms it.
@@ -34,7 +33,7 @@ class Omniglot(VisionDataset):
 
     def __init__(
         self,
-        root: Union[str, Path],
+        root: str,
         background: bool = True,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,

@@ -6,7 +6,7 @@
 
     // Handle file upload and redirect logic
     // Set the base directory path
-    $base_directory = '/Volumes/creative/';
+    $base_directory = '/Volumes/creative';
     $current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
 
     // Function to convert file path to URL
@@ -46,54 +46,70 @@
     }
     function searchFilesAndFolders($conn, $searchTerm) {
         $searchTerm = '%' . $conn->real_escape_string($searchTerm) . '%';
-
-        // Prepare SQL queries to search in files and folders
+    
+        // Prepare SQL query to search in files table for direct matches
         $fileQuery = $conn->prepare("SELECT * FROM files WHERE filename LIKE ? OR filepath LIKE ?");
         $fileQuery->bind_param("ss", $searchTerm, $searchTerm);
         $fileQuery->execute();
         $fileResults = $fileQuery->get_result();
-
+    
+        // Prepare SQL query to search in folders table for direct matches
         $folderQuery = $conn->prepare("SELECT * FROM folders WHERE filename LIKE ? OR filepath LIKE ?");
         $folderQuery->bind_param("ss", $searchTerm, $searchTerm);
         $folderQuery->execute();
         $folderResults = $folderQuery->get_result();
+    
+        // New logic: Find tags matching the search term and get related files
+    $taggedFilesQuery = $conn->prepare("
+    SELECT DISTINCT f.id, f.filename, f.filepath, f.filetype
+    FROM files AS f
+    INNER JOIN tag AS t ON f.filepath = t.filepath
+    WHERE t.tag LIKE ?
+");
+$taggedFilesQuery->bind_param("s", $searchTerm);
+$taggedFilesQuery->execute();
+$taggedFilesResults = $taggedFilesQuery->get_result();
 
-        // Find tags matching the search term
-        $tagQuery = $conn->prepare("SELECT tag_id FROM tag WHERE tag LIKE ? OR type LIKE ?");
-        $tagQuery->bind_param("ss", $searchTerm, $searchTerm);
-        $tagQuery->execute();
-        $tagResults = $tagQuery->get_result();
+// Merge file results with tagged files (ensure unique entries)
+$fileResultsArray = $fileResults->fetch_all(MYSQLI_ASSOC);
+$taggedFilesArray = $taggedFilesResults->fetch_all(MYSQLI_ASSOC);
 
-        // If matching tags are found, fetch associated files
-        $taggedFiles = [];
-        if ($tagResults->num_rows > 0) {
-            while ($tagRow = $tagResults->fetch_assoc()) {
-                $tagId = $tagRow['tag_id'];
-                $relatedFilesQuery = $conn->prepare("SELECT * FROM files WHERE tag_id = ?");
-                $relatedFilesQuery->bind_param("i", $tagId);
-                $relatedFilesQuery->execute();
-                $relatedFiles = $relatedFilesQuery->get_result()->fetch_all(MYSQLI_ASSOC);
-                $taggedFiles = array_merge($taggedFiles, $relatedFiles);
-                $relatedFilesQuery->close();
-            }
-        }
+// Combine the results and remove duplicates based on 'id'
+$allFiles = [];
+$fileIds = []; // To track already added file IDs
 
-        // Merge file results with tagged files
-        $allFiles = array_merge($fileResults->fetch_all(MYSQLI_ASSOC), $taggedFiles);
-
-        // Combine results
-        $results = [
-            'files' => $allFiles, // Files now include those associated with matching tags
-            'folders' => $folderResults->fetch_all(MYSQLI_ASSOC),
-        ];
-
-        // Close statements
-        $fileQuery->close();
-        $folderQuery->close();
-        $tagQuery->close();
-
-        return $results;
+// Add files directly found in the 'files' table
+foreach ($fileResultsArray as $file) {
+    $file['filetype'] = $file['filetype'] ?? 'unknown'; // Handle missing filetype
+    if (!in_array($file['id'], $fileIds)) {
+        $allFiles[] = $file;
+        $fileIds[] = $file['id'];
     }
+}
+
+// Add files matched via tags
+foreach ($taggedFilesArray as $file) {
+    $file['filetype'] = $file['filetype'] ?? 'unknown'; // Handle missing filetype
+    if (!in_array($file['id'], $fileIds)) {
+        $allFiles[] = $file;
+        $fileIds[] = $file['id'];
+    }
+}
+
+// Combine results
+$results = [
+    'files' => $allFiles, // Files now include unique entries matched by tags and filenames/filepaths
+    'folders' => $folderResults->fetch_all(MYSQLI_ASSOC), // Folders remain unchanged
+];
+
+// Close statements
+$fileQuery->close();
+$folderQuery->close();
+$taggedFilesQuery->close();
+
+return $results;
+}
+    
 
 
 
@@ -214,6 +230,7 @@
 
 
 
+
             
 
 
@@ -260,210 +277,351 @@
     <head>
     <?php include 'head.php'; ?>
         <style>
-            /* Ensure the table scrolls horizontally on smaller screens */
-            #tagDropdown {
-            position: absolute;
-            top: 100%; /* Position below the input */
-            left: 0;
-            z-index: 1050;
-            border: 1px solid #ddd;
-            background-color: white;
-            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-        }
+        /* Ensure the table scrolls horizontally on smaller screens */
+#tagDropdown {
+    position: absolute;
+    top: 100%; /* Position below the input */
+    left: 0;
+    z-index: 1050;
+    border: 1px solid #ddd;
+    background-color: white;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
 
-        #tagDropdown .dropdown-item:hover {
-            background-color: #f8f9fa;
-        }
+#tagDropdown .dropdown-item:hover {
+    background-color: #f8f9fa;
+}
 
-            /* Style for truncating long file paths */
-    .file-path-wrapper {
-        max-width: 300px; /* Adjust as needed */
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+/* Style for truncating long file paths */
+.file-path-wrapper {
+    max-width: 300px; /* Adjust as needed */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
-    .file-path {
-        display: inline-block;
-        width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        cursor: pointer;
-    }
+.file-path {
+    display: inline-block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
 
-    .file-path:hover {
-        color: #0056b3; /* Optional: Add hover color */
-        text-decoration: underline; /* Optional: Add underline effect */
-    }
+.file-path:hover {
+    color: #0056b3; /* Optional: Add hover color */
+    text-decoration: underline; /* Optional: Add underline effect */
+}
 
+.table-responsive {
+    overflow-x: auto;
+}
 
-    .table-responsive {
-        overflow-x: auto;
-    }
+/* Limit the width of the file path column */
+.file-path-column {
+    max-width: 300px; /* Adjust as needed */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Add ellipsis for truncated text */
+    white-space: nowrap; /* Prevent wrapping */
+}
 
-    /* Limit the width of the file path column */
-    .file-path-column {
-        max-width: 300px; /* Adjust as needed */
-        overflow: hidden;
-        text-overflow: ellipsis; /* Add ellipsis for truncated text */
-        white-space: nowrap; /* Prevent wrapping */
-    }
+/* Make file path clickable and readable */
+.file-path-wrapper a {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    text-decoration: none;
+    color: #007bff; /* Bootstrap link color */
+}
 
-    /* Make file path clickable and readable */
-    .file-path-wrapper a {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 100%;
-        text-decoration: none;
-        color: #007bff; /* Bootstrap link color */
-    }
+.col-lg-12,
+.table-responsive,
+table {
+    width: 100%;
+}
 
-            /* Your existing styles */
-            .col-lg-12,
-            .table-responsive,
-            table {
-                width: 100%;
-            }
+table {
+    border-collapse: collapse; /* Optional: removes spacing between cells */
+}
 
-            table {
-                border-collapse: collapse; /* Optional: removes spacing between cells */
-            }
+th, td {
+    padding: 8px; /* Adjust padding as needed */
+    text-align: left;
+}
 
-            th, td {
-                
-                padding: 8px; /* Adjust padding as needed */
-                text-align: left;
-            }
+#file-list img {
+    margin: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer; /* Make images clickable */
+}
 
-            #file-list img {
-                margin: 5px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                cursor: pointer; /* Make images clickable */
-            }
+#file-list li {
+    list-style: none;
+}
 
-            #file-list li {
-                list-style: none;
-            }
+/* Styles for the preview overlay and content */
+#file-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    overflow: hidden; /* Prevents scrolling of the entire overlay */
+}
 
-            /* Styles for the preview overlay and content */
-            #file-preview-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background-color: rgba(0, 0, 0, 0.8);
-                display: none;
-                justify-content: center;
-                align-items: center;
-                z-index: 1000;
-                overflow: hidden; /* Prevents scrolling of the entire overlay */
-            }
+#file-preview-content {
+    max-width: 95vw;
+    max-height: 95vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* Prevents scrollbars inside the content container */
+}
 
-            #file-preview-content {
-                max-width: 95vw;
-                max-height: 95vh;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                overflow: hidden; /* Prevents scrollbars inside the content container */
-            }
+.preview-media {
+    width: 100vw; /* Full width of the viewport */
+    height: 80vh; /* Full height of the viewport */
+    object-fit: contain; /* Maintain aspect ratio */
+}
 
-            .preview-media {
-                width: 100vw; /* Full width of the viewport */
-                height: 80vh; /* Full height of the viewport */
-                object-fit: contain; /* Maintain aspect ratio */
-            }
+#close-preview-btn {
+    position: absolute;
+    top: 20px; /* Adjusted position from the top */
+    left: 20px; /* Adjusted position from the left */
+    font-size: 2rem; /* Font size for the close button */
+    color: white; /* Color set to white for visibility */
+    background: none; /* No background */
+    border: none; /* No border */
+    cursor: pointer; /* Pointer cursor on hover */
+    z-index: 1100; /* Ensure it’s above everything else */
+    margin-top: 40px; /* Adjust this value as needed */
+}
 
-            #close-preview-btn {
-                position: absolute;
-                top: 20px; /* Adjusted position from the top */
-                left: 20px; /* Adjusted position from the left */
-                font-size: 2rem; /* Font size for the close button */
-                color: white; /* Color set to white for visibility */
-                background: none; /* No background */
-                border: none; /* No border */
-                cursor: pointer; /* Pointer cursor on hover */
-                z-index: 1100; /* Ensure it’s above everything else */
-                margin-top: 40px; /* Adjust this value as needed */
-            }
+#close-preview-btn:hover {
+    opacity: 0.7; /* Slightly transparent on hover */
+}
 
-            #close-preview-btn:hover {
-                opacity: 0.7; /* Slightly transparent on hover */
-            }
+.dropdown-toggle.no-caret::after {
+    display: none;
+}
 
-            .dropdown-toggle.no-caret::after {
-                display: none;
-            }
+/* Custom styles for the button container */
+.button-container {
+    display: flex;
+    gap: 10px; /* Space between buttons */
+    margin-bottom: 20px; /* Space below the button container */
+}
 
-            /* Custom styles for the button container */
-            .button-container {
-                display: flex;
-                gap: 10px; /* Space between buttons */
-                margin-bottom: 20px; /* Space below the button container */
+.table {
+    table-layout: auto; /* Allow columns to adjust automatically */
+    width: 100%; /* Ensure the table spans the full container width */
+}
 
-            }
+.table th, .table td {
+    white-space: nowrap; /* Prevent text from wrapping */
+    text-align: left; /* Align content to the left */
+    vertical-align: middle; /* Align content vertically */
+}
 
-            .table {
-        table-layout: auto; /* Allow columns to adjust automatically */
-        width: 100%; /* Ensure the table spans the full container width */
-    }
+.table th.actions-column, .table td.actions-column {
+    width: 15%; /* Allocate enough space for the Actions dropdown */
+}
 
-    .table th, .table td {
-        white-space: nowrap; /* Prevent text from wrapping */
-        text-align: left; /* Align content to the left */
-        vertical-align: middle; /* Align content vertically */
-    }
+.dropdown-menu {
+    z-index: 1050; /* Ensure dropdown appears above other elements */
+}
 
-    .table th.actions-column, .table td.actions-column {
-        width: 15%; /* Allocate enough space for the Actions dropdown */
-    }
+.datatable {
+    overflow-x: auto; /* Enable horizontal scrolling if the table is too wide */
+}
 
-    .dropdown-menu {
-        z-index: 1050; /* Ensure dropdown appears above other elements */
-    }
+.table-responsive {
+    overflow-x: visible; /* Ensure dropdowns are not cut off in smaller containers */
+}
 
-    .datatable {
-        overflow-x: auto; /* Enable horizontal scrolling if the table is too wide */
-    }
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
 
-    .table-responsive {
-        overflow-x: visible; /* Ensure dropdowns are not cut off in smaller containers */
-    }
+.tag-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
 
-    .filter-buttons {
-                display: flex;
-                gap: 10px;
-                margin-bottom: 20px;
-            }
+/* Grid View Styles */
+.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Dynamically fills the width */
+    gap: 20px; /* Even spacing between grid items */
+    padding: 10px;
+    width: 100%; /* Ensures the grid spans the full width */
+    margin: 0; /* Removes unnecessary margin */
+    box-sizing: border-box; /* Ensures padding is included in the width */
+}
 
-            .tag-checkboxes {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-            }
-            .file-path-wrapper {
-                max-width: 300px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            .file-path {
-                text-decoration: none;
-                color: #007bff;
-            }
-            .file-path:hover {
-                text-decoration: underline;
-            }
-            .datatable-search .datatable-input
-            {
-                display:none;
-            }
+.grid-item {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    text-align: center;
+    transition: transform 0.3s;
+}
+
+.grid-item:hover {
+    transform: translateY(-5px);
+}
+
+.grid-item img, .grid-item video {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.container {
+    max-width: 100%; /* Remove any container width restrictions */
+    padding-left: 10px;
+    padding-right: 10px;
+    margin: 0 auto; /* Center the container if necessary */
+}
+
+/* Updated Grid View */
+.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px; /* Even spacing between grid items */
+    padding: 10px;
+    margin: 0 auto; /* Center the grid container */
+}
+
+.grid-item {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    text-align: center;
+    transition: transform 0.3s;
+}
+
+.grid-item:hover {
+    transform: translateY(-5px);
+}
+
+.grid-item img, .grid-item video {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.grid-view {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.grid-view .grid-item {
+    display: flex;
+    flex-direction: column;
+    width: 23%;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.grid-view img, .grid-view video {
+    width: 100%;
+    max-height: 150px;
+    object-fit: cover;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
+.grid-view .file-info {
+    text-align: center;
+}
+
+/* File preview overlay */
+#file-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+}
+
+#file-preview-content {
+    max-width: 80%;
+    max-height: 80%;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* View Buttons */
+.view-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+.view-buttons .btn-group {
+    display: flex;
+    border: 1px solid #ccc;
+    border-radius: 50px;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+.view-buttons .btn {
+    border: none;
+    background: none;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+}
+
+.view-buttons .btn.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.view-buttons .btn i {
+    font-size: 18px;
+}
+
+/* Table Thumbnails */
+#fileTable img, #fileTable video {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
         </style>
     </head>
 
@@ -479,6 +637,10 @@
             <li class="breadcrumb-item active">File Management</li>
         </ol>
     </div>
+
+
+
+ 
         </div><!-- End Page Title -->
 
         <!-- Search Bar and Filter Options -->
@@ -889,12 +1051,19 @@
     
     <!-- Move to Trash -->
     <button type="button" class="btn btn-warning" id="moveToTrashBtn">Move to Trash</button>
+     <!-- Publish Selected -->
+     <button type="button" class="btn btn-success" id="publishSelectedBtn">
+        <i class="fas fa-upload"></i> Publish Selected
+    </button>
 
-     <!-- Add Tag -->
-     <input type="text" id="tagInput" placeholder="Add tag to file/folder" style="display: none; margin-right: 10px;">
+    <!-- Add Tag -->
+    <input type="text" id="tagInput" placeholder="Add tag to file/folder" style="display: none; margin-right: 10px;">
     <button type="button" class="btn btn-primary" id="addTagBtn" style="display: none;">Add Tag</button>
 
+    <!-- Upload Selected -->
+    <!--  <button type="button" class="btn btn-success" id="uploadSelectedBtn">Upload Selected</button>-->
 </div>
+
 
     <!-- SCRIPT FOR BULK DELETE-->
 <script>
@@ -1213,6 +1382,105 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 
+
+
+<!-- SCRIPT FOR BULK PUBLISH-->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const actionButtonContainer = document.querySelector('.action-button-container');
+    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+    const publishSelectedBtn = document.getElementById('publishSelectedBtn');
+
+    // Function to toggle the visibility of the action button
+    function toggleActionButton() {
+        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+        actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+    }
+
+    // Add event listeners to all checkboxes
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', toggleActionButton);
+    });
+
+    // Run once to ensure the button's initial state is correct
+    toggleActionButton();
+
+    // Bulk publish logic with alert and confirmation
+    publishSelectedBtn.addEventListener('click', async function () {
+        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
+
+        if (selectedCheckboxes.length === 0) {
+            alert('No files selected for publishing.');
+            return;
+        }
+
+        // Collect the names of all selected files/folders
+        const selectedItems = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            return row.querySelector('td:nth-child(2)').textContent.trim(); // File name
+        });
+
+        // Alert the list of selected items once
+        alert(`The following files/folders are selected for publishing:\n\n${selectedItems.join('\n')}`);
+
+        // Create a confirmation message
+        const confirmationMessage = `Are you sure you want to publish these files/folders?`;
+
+        if (!confirm(confirmationMessage)) {
+            return; // Exit if the user cancels
+        }
+
+        // Send publish requests for all selected items
+        const publishPromises = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            const filePath = row.getAttribute('data-path'); // Get the file path
+
+            return publishMedia(filePath);
+        });
+
+        try {
+            // Wait for all publishing operations to complete
+            const results = await Promise.all(publishPromises);
+
+            // Filter success and failure messages
+            const successCount = results.filter(result => result.status === 'success').length;
+            const errorCount = results.length - successCount;
+
+            // Alert success message once
+            alert(`Publishing complete. ${successCount} item(s) published successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to publish.` : ''}`);
+
+            // Optionally reload the page or update the UI
+            location.reload();
+        } catch (error) {
+            console.error('Error during publishing:', error);
+            alert('An unexpected error occurred during publishing.');
+        }
+    });
+
+    // Function to handle the publishing request
+    async function publishMedia(filePath) {
+        try {
+            const response = await fetch('publishMedia.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filepath: filePath }),
+            });
+
+            return await response.json(); // Parse the JSON response
+        } catch (error) {
+            console.error(`Error publishing file:`, error);
+            return { status: 'error', message: 'Network error during publishing.' };
+        }
+    }
+});
+
+
+</script>
+
+
+
 <style>
      .action-button-container {
         margin-top: 10px;
@@ -1254,105 +1522,91 @@ document.addEventListener("DOMContentLoaded", function() {
         padding: 5px;
         font-size: 14px;
     }
+    
 </style>
 
 
-        <div class="table-responsive">
-            <table class="datatable table table-hover table-striped" id="fileTable">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="selectAllCheckbox"></th>
-                        <th>File/Folder Name</th>
-                        <th>Type</th>
-                    
-                        <th class="file-path-column">File Path</th>
-                        <th>Actions</th>
+<div class="view-buttons">
+    <div class="btn-group">
+        <button class="btn active" onclick="switchToListView()" id="listViewBtn">
+            <i class="fas fa-list"></i>
+        </button>
+        <button class="btn" onclick="switchToGridView()" id="gridViewBtn">
+            <i class="fas fa-th"></i>
+        </button>
+    </div>
+</div>
+
+<div id="fileContainer" class="list-view table-responsive">
+    <table class="datatable table table-hover table-striped" id="fileTable">
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="selectAllCheckbox"></th>
+                <th>File/Folder Name</th>
+                <th>Type</th>
+                <th class="file-path-column">File Path</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($_GET['search'])): ?>
+                <?php
+                // Ensure `.DS_Store` is excluded consistently
+                $items = array_filter(scandir($current_directory), function ($item) use ($current_directory) {
+                    return $item !== '.' && $item !== '..' && $item !== '.DS_Store' && file_exists($current_directory . '/' . $item);
+                });
+
+                foreach ($items as $item):
+                    $item_path = $current_directory . '/' . $item;
+                    $is_dir = is_dir($item_path);
+                    $item_type = $is_dir ? 'folder' : 'file';
+                    $web_url = convertFilePathToURL($item_path); // Convert the file path to a web URL
+                ?>
+                    <tr data-path="<?php echo htmlspecialchars($item_path, ENT_QUOTES, 'UTF-8'); ?>">
+                        <td><input type="checkbox" class="rowCheckbox"></td>
+                        <td>
+                            <?php if ($is_dir): ?>
+                                <!-- Folder -->
+                                <a href="?dir=<?php echo urlencode($item_path); ?>" class="file-folder-link" 
+                                   onclick="recordActivity('<?php echo addslashes($item); ?>', 'folder', '<?php echo htmlspecialchars($item_path); ?>')">
+                                    <?php echo htmlspecialchars($item); ?>
+                                </a>
+                            <?php else: ?>
+                                <!-- File -->
+                                <a href="javascript:void(0);" class="file-folder-link" 
+                                   data-url="<?php echo htmlspecialchars($web_url); ?>" 
+                                   data-type="<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>" 
+                                   onclick="recordActivity('<?php echo addslashes($item); ?>', 'file', '<?php echo htmlspecialchars($item_path); ?>'); openModal('<?php echo htmlspecialchars($web_url); ?>', '<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>')">
+                                    <?php echo htmlspecialchars($item); ?>
+                                </a>
+                            <?php endif; ?>
+                        </td>
+                        <td><?php echo $is_dir ? 'Folder' : 'File'; ?></td>
+                        <td class="file-path-column">
+                            <div class="file-path-wrapper">
+                                <a href="<?php echo htmlspecialchars($web_url); ?>" target="_blank" class="file-path">
+                                    <?php echo htmlspecialchars($web_url); ?>
+                                </a>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($item); ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-cogs"></i> Actions
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($item); ?>">
+                                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="publishMedia('<?php echo htmlspecialchars($item_path); ?>')"><i class="fas fa-cloud-upload-alt"></i> Publish</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')"><i class="fas fa-i-cursor"></i> Rename</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($item_path); ?>')"><i class="fas fa-copy"></i> Copy</a></li>
+                                    <li><a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($item_path); ?>')"><i class="fas fa-download"></i> Download</a></li>
+                                    <li><a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($item_path, ENT_QUOTES, 'UTF-8'); ?>', '<?php echo htmlspecialchars($item, ENT_QUOTES, 'UTF-8'); ?>')"><i class="fas fa-trash"></i> Delete</a></li>
+                                </ul>
+                            </div>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-
-
-
-
-                <?php if (empty($_GET['search'])): ?>
-    <?php
-    // Ensure `.DS_Store` is excluded consistently
-    $items = array_filter(scandir($current_directory), function ($item) use ($current_directory) {
-        return $item !== '.' && $item !== '..' && $item !== '.DS_Store' && file_exists($current_directory . '/' . $item);
-    });
-
-    foreach ($items as $item):
-        $item_path = $current_directory . '/' . $item;
-        $is_dir = is_dir($item_path);
-        $item_type = $is_dir ? 'folder' : 'file';
-        $web_url = convertFilePathToURL($item_path); // Convert the file path to a web URL
-    ?>
-        <tr data-path="<?php echo htmlspecialchars($item_path, ENT_QUOTES, 'UTF-8'); ?>">
-            <td><input type="checkbox" class="rowCheckbox"></td>
-            <td>
-                <?php if ($is_dir): ?>
-                    <!-- Folder -->
-                    <a href="?dir=<?php echo urlencode($item_path); ?>" class="file-folder-link" 
-                       onclick="recordActivity('<?php echo addslashes($item); ?>', 'folder', '<?php echo htmlspecialchars($item_path); ?>')">
-                        <?php echo htmlspecialchars($item); ?>
-                    </a>
-                <?php else: ?>
-                    <!-- File -->
-                    <a href="javascript:void(0);" class="file-folder-link" 
-                       data-url="<?php echo htmlspecialchars($web_url); ?>" 
-                       data-type="<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>" 
-                       onclick="recordActivity('<?php echo addslashes($item); ?>', 'file', '<?php echo htmlspecialchars($item_path); ?>'); openModal('<?php echo htmlspecialchars($web_url); ?>', '<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>')">
-                        <?php echo htmlspecialchars($item); ?>
-                    </a>
-                <?php endif; ?>
-            </td>
-            <td><?php echo $is_dir ? 'Folder' : 'File'; ?></td>
-            <td class="file-path-column">
-                <div class="file-path-wrapper">
-                    <a href="<?php echo htmlspecialchars($web_url); ?>" target="_blank" class="file-path">
-                        <?php echo htmlspecialchars($web_url); ?>
-                    </a>
-                </div>
-            </td>
-            <td>
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($item); ?>" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-cogs"></i> Actions
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($item); ?>">
-
-                    <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="publishMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item_path); ?>')">
-                    <i class="fas fa-cloud-upload-alt"></i> Publish
-                </a>
-            </li>
-                        
-                        <li>
-                            <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')">
-                                <i class="fas fa-i-cursor"></i> Rename
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                                <i class="fas fa-copy"></i> Copy
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                                <i class="fas fa-download"></i> Download
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($item_path, ENT_QUOTES, 'UTF-8'); ?>', '<?php echo htmlspecialchars($item, ENT_QUOTES, 'UTF-8'); ?>')">
-                                <i class="fas fa-trash"></i> Delete
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </td>
-        </tr>
-    <?php endforeach; ?>
-<?php else: ?>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <!-- Display search results -->
                 <?php if (!empty($searchResults['folders']) || !empty($searchResults['files'])): ?>
                     <?php foreach ($searchResults['folders'] as $folder): ?>
                         <tr>
@@ -1379,26 +1633,10 @@ document.addEventListener("DOMContentLoaded", function() {
                                         <i class="fas fa-cogs"></i> Actions
                                     </button>
                                     <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($folder['filename']); ?>">
-                                        <li>
-                                            <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($folder['filepath']); ?>', '<?php echo htmlspecialchars($folder['filename']); ?>')">
-                                                <i class="fas fa-i-cursor"></i> Rename
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($folder['filepath']); ?>')">
-                                                <i class="fas fa-copy"></i> Copy
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($folder['filepath']); ?>')">
-                                                <i class="fas fa-download"></i> Download
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($folder['filepath'], ENT_QUOTES, 'UTF-8'); ?>', '<?php echo htmlspecialchars($folder['filename'], ENT_QUOTES, 'UTF-8'); ?>')">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </a>
-                                        </li>
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($folder['filepath']); ?>', '<?php echo htmlspecialchars($folder['filename']); ?>')"><i class="fas fa-i-cursor"></i> Rename</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($folder['filepath']); ?>')"><i class="fas fa-copy"></i> Copy</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($folder['filepath']); ?>')"><i class="fas fa-download"></i> Download</a></li>
+                                        <li><a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($folder['filepath'], ENT_QUOTES, 'UTF-8'); ?>', '<?php echo htmlspecialchars($folder['filename'], ENT_QUOTES, 'UTF-8'); ?>')"><i class="fas fa-trash"></i> Delete</a></li>
                                     </ul>
                                 </div>
                             </td>
@@ -1432,17 +1670,9 @@ document.addEventListener("DOMContentLoaded", function() {
                                         <i class="fas fa-cogs"></i> Actions
                                     </button>
                                     <ul class="dropdown-menu">
-                                        
-                                            
-                                        <li>
-                                            <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-copy"></i> Copy</a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-download"></i> Download</a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($file['filepath']); ?>', '<?php echo htmlspecialchars($file['filename']); ?>')"><i class="fas fa-trash"></i> Delete</a>
-                                        </li>
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-copy"></i> Copy</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-download"></i> Download</a></li>
+                                        <li><a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($file['filepath']); ?>', '<?php echo htmlspecialchars($file['filename']); ?>')"><i class="fas fa-trash"></i> Delete</a></li>
                                     </ul>
                                 </div>
                             </td>
@@ -1456,7 +1686,66 @@ document.addEventListener("DOMContentLoaded", function() {
     </table>
 </div>
 
+<div id="fileGrid" class="grid-view" style="display: none;">
+    <?php foreach ($items as $item): ?>
+        <?php 
+        $item_path = $current_directory . '/' . $item;
+        $is_dir = is_dir($item_path);
+        $item_type = $is_dir ? 'folder' : 'file';
+        $web_url = convertFilePathToURL($item_path);
+        ?>
+        <div class="grid-item">
+            <?php if ($is_dir): ?>
+                <a href="?dir=<?php echo urlencode($item_path); ?>" class="file-folder-link">
+                    <div class="file-thumbnail">[Folder Icon]</div>
+                    <p><?php echo htmlspecialchars($item); ?></p>
+                </a>
+            <?php else: ?>
+                <a href="javascript:void(0);" class="file-folder-link" onclick="openModal('<?php echo htmlspecialchars($web_url); ?>', '<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>')">
+                    <div class="file-thumbnail">
+                        <?php if (preg_match('/(jpg|jpeg|png|gif)$/i', pathinfo($item, PATHINFO_EXTENSION))): ?>
+                            <img src="<?php echo htmlspecialchars($web_url); ?>" alt="Image">
+                        <?php elseif (preg_match('/(mp4|mov)$/i', pathinfo($item, PATHINFO_EXTENSION))): ?>
+                            <video src="<?php echo htmlspecialchars($web_url); ?>" controls></video>
+                        <?php else: ?>
+                            <span>No Preview</span>
+                        <?php endif; ?>
+                    </div>
+                    <p><?php echo htmlspecialchars($item); ?></p>
+                </a>
+            <?php endif; ?>
+        </div>
+    <?php endforeach; ?>
+</div>
 
+<script>
+    $(document).ready(function() {
+        $('#fileTable').DataTable({
+            "order": [[3, "desc"]],
+            "pageLength": 5,
+            "lengthMenu": [5, 10, 25, 50, 100],
+            "dom": 'lfrtip'
+        });
+    });
+
+    function openModal(fileUrl, fileType) {
+        // Implement logic to open file preview in modal
+    }
+
+    function switchToListView() {
+        document.getElementById('fileContainer').style.display = "block";
+        document.getElementById('fileGrid').style.display = "none";
+        document.getElementById('listViewBtn').classList.add("active");
+        document.getElementById('gridViewBtn').classList.remove("active");
+    }
+
+    function switchToGridView() {
+        document.getElementById('fileContainer').style.display = "none";
+        document.getElementById('fileGrid').style.display = "flex";
+        document.getElementById('gridViewBtn').classList.add("active");
+        document.getElementById('listViewBtn').classList.remove("active");
+    }
+</script>
 
 
 
@@ -1476,41 +1765,31 @@ document.getElementById('selectAllCheckbox').addEventListener('click', function(
 
 
 
-    function publishMedia(fileName, filePath) {
-        if (confirm("Are you sure you want to publish this item?")) {
-            var data = {
-                filename: fileName.trim(), // File name only
-                filepath: filePath.trim()  // Full file path
-            };
+//PUBLISH SCRIPT
+async function publishMedia(filepath) {
+    try {
+        const response = await fetch('publishMedia.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filepath: filepath })
+        });
 
-            console.log("DEBUG: Data being sent to server:", data); // Log the data being sent
+        const result = await response.json();
 
-            $.ajax({
-                url: './actions/publish.php',
-                type: 'POST',
-                data: data,
-                success: function(response) {
-                    console.log("Response from server:", response); // Log raw response
-                    try {
-                        var jsonResponse = JSON.parse(response); // Parse JSON response
-                        if (jsonResponse.status === 'success') {
-                            alert('File has been successfully published!');
-                            location.reload(); // Reload the page to reflect the changes
-                        } else {
-                            alert('Error: ' + jsonResponse.message);
-                        }
-                    } catch (e) {
-                        console.error("Error parsing response:", e);
-                        alert("Error: Failed to parse response. Check the console for details.");
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error("Publishing failed:", status, error);
-                    alert('Error: Could not publish the item. Check console for details.');
-                }
-            });
+        if (result.status === 'success') {
+            alert('File published successfully!');
+        } else {
+            alert('Error: ' + result.message);
         }
+    } catch (error) {
+        console.error('Error publishing file:', error);
+        alert('An error occurred while publishing the file.');
     }
+}
+
+
 
 
 
@@ -1741,7 +2020,7 @@ document.getElementById('selectAllCheckbox').addEventListener('click', function(
             img.src = updatedFileUrl;
             img.className = "preview-media";
             content.appendChild(img);
-        } else if (fileType.match(/(mp4|mp3|wav|mov)$/i)) {
+        } else if (fileType.match(/(mp4|mp3|wav|mov|CR2|xmp)$/i)) {
             var video = document.createElement("video");
             video.src = updatedFileUrl;
             video.className = "preview-media";
@@ -1836,27 +2115,27 @@ document.getElementById('selectAllCheckbox').addEventListener('click', function(
 
 
 
-
     function renameMedia(filePath, fileName) {
-        const newName = prompt("Enter the new name for the file:", fileName);
-        if (newName) {
-            fetch('rename_file.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filePath: filePath, newName: newName })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert("File renamed successfully!");
-                    location.reload();
-                } else {
-                    alert("Error renaming file: " + data.error);
-                }
-            })
-            .catch(error => console.error("Error:", error));
-        }
+    const newName = prompt("Enter the new name for the file:", fileName);
+    if (newName) {
+        fetch('rename_file.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath: filePath, newName: newName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("File renamed successfully!");
+                location.reload();
+            } else {
+                alert("Error renaming file: " + data.error);
+            }
+        })
+        .catch(error => console.error("Error:", error));
     }
+}
+
 
 
     function deleteMedia(filePath, fileName) {

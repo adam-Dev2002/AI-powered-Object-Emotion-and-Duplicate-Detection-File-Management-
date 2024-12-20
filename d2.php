@@ -6,7 +6,7 @@
 
     // Handle file upload and redirect logic
     // Set the base directory path
-    $base_directory = '/Volumes/creative/greyhoundhub';
+    $base_directory = '/Volumes/creative';
     $current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
 
     // Function to convert file path to URL
@@ -46,54 +46,70 @@
     }
     function searchFilesAndFolders($conn, $searchTerm) {
         $searchTerm = '%' . $conn->real_escape_string($searchTerm) . '%';
-
-        // Prepare SQL queries to search in files and folders
+    
+        // Prepare SQL query to search in files table for direct matches
         $fileQuery = $conn->prepare("SELECT * FROM files WHERE filename LIKE ? OR filepath LIKE ?");
         $fileQuery->bind_param("ss", $searchTerm, $searchTerm);
         $fileQuery->execute();
         $fileResults = $fileQuery->get_result();
-
+    
+        // Prepare SQL query to search in folders table for direct matches
         $folderQuery = $conn->prepare("SELECT * FROM folders WHERE filename LIKE ? OR filepath LIKE ?");
         $folderQuery->bind_param("ss", $searchTerm, $searchTerm);
         $folderQuery->execute();
         $folderResults = $folderQuery->get_result();
+    
+        // New logic: Find tags matching the search term and get related files
+    $taggedFilesQuery = $conn->prepare("
+    SELECT DISTINCT f.id, f.filename, f.filepath, f.filetype
+    FROM files AS f
+    INNER JOIN tag AS t ON f.filepath = t.filepath
+    WHERE t.tag LIKE ?
+");
+$taggedFilesQuery->bind_param("s", $searchTerm);
+$taggedFilesQuery->execute();
+$taggedFilesResults = $taggedFilesQuery->get_result();
 
-        // Find tags matching the search term
-        $tagQuery = $conn->prepare("SELECT tag_id FROM tag WHERE tag LIKE ? OR type LIKE ?");
-        $tagQuery->bind_param("ss", $searchTerm, $searchTerm);
-        $tagQuery->execute();
-        $tagResults = $tagQuery->get_result();
+// Merge file results with tagged files (ensure unique entries)
+$fileResultsArray = $fileResults->fetch_all(MYSQLI_ASSOC);
+$taggedFilesArray = $taggedFilesResults->fetch_all(MYSQLI_ASSOC);
 
-        // If matching tags are found, fetch associated files
-        $taggedFiles = [];
-        if ($tagResults->num_rows > 0) {
-            while ($tagRow = $tagResults->fetch_assoc()) {
-                $tagId = $tagRow['tag_id'];
-                $relatedFilesQuery = $conn->prepare("SELECT * FROM files WHERE tag_id = ?");
-                $relatedFilesQuery->bind_param("i", $tagId);
-                $relatedFilesQuery->execute();
-                $relatedFiles = $relatedFilesQuery->get_result()->fetch_all(MYSQLI_ASSOC);
-                $taggedFiles = array_merge($taggedFiles, $relatedFiles);
-                $relatedFilesQuery->close();
-            }
-        }
+// Combine the results and remove duplicates based on 'id'
+$allFiles = [];
+$fileIds = []; // To track already added file IDs
 
-        // Merge file results with tagged files
-        $allFiles = array_merge($fileResults->fetch_all(MYSQLI_ASSOC), $taggedFiles);
-
-        // Combine results
-        $results = [
-            'files' => $allFiles, // Files now include those associated with matching tags
-            'folders' => $folderResults->fetch_all(MYSQLI_ASSOC),
-        ];
-
-        // Close statements
-        $fileQuery->close();
-        $folderQuery->close();
-        $tagQuery->close();
-
-        return $results;
+// Add files directly found in the 'files' table
+foreach ($fileResultsArray as $file) {
+    $file['filetype'] = $file['filetype'] ?? 'unknown'; // Handle missing filetype
+    if (!in_array($file['id'], $fileIds)) {
+        $allFiles[] = $file;
+        $fileIds[] = $file['id'];
     }
+}
+
+// Add files matched via tags
+foreach ($taggedFilesArray as $file) {
+    $file['filetype'] = $file['filetype'] ?? 'unknown'; // Handle missing filetype
+    if (!in_array($file['id'], $fileIds)) {
+        $allFiles[] = $file;
+        $fileIds[] = $file['id'];
+    }
+}
+
+// Combine results
+$results = [
+    'files' => $allFiles, // Files now include unique entries matched by tags and filenames/filepaths
+    'folders' => $folderResults->fetch_all(MYSQLI_ASSOC), // Folders remain unchanged
+];
+
+// Close statements
+$fileQuery->close();
+$folderQuery->close();
+$taggedFilesQuery->close();
+
+return $results;
+}
+    
 
 
 
@@ -250,10 +266,6 @@
             $_SESSION['alert'] = "Folder name cannot be empty.";    
         }
     }
-
-
-
-    
 
 
     ?>
@@ -468,118 +480,6 @@
             {
                 display:none;
             }
-
-
-
-            /* Container for the entire tree */
-.folder-tree {
-    font-family: 'Arial', sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);
-    overflow-y: auto;
-    height: 500px; /* Adjust based on your layout */
-}
-
-/* Style the folder tree list */
-.folder-tree ul {
-    list-style-type: none;
-    padding-left: 20px;
-    margin: 0;
-}
-
-/* Style individual folder and file items */
-.folder-tree li {
-    margin: 5px 0;
-    padding: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, padding-left 0.3s ease;
-}
-
-/* Highlight folder and file items on hover */
-.folder-tree li:hover {
-    background-color: #e6f7ff;
-    padding-left: 30px;
-}
-
-/* Style for folder icons */
-.folder-tree .folder i {
-    margin-right: 10px;
-    color: #007bff;
-    transition: transform 0.3s ease;
-}
-
-/* Style for file icons */
-.folder-tree .file i {
-    margin-right: 10px;
-    color: #333;
-}
-
-/* Folder triangle icon styles */
-.folder-tree .folder::before {
-    content: '\25B6'; /* Right triangle (▶) */
-    font-family: 'Arial', sans-serif;
-    font-size: 14px;
-    margin-right: 10px;
-    color: #007bff;
-    transition: transform 0.3s ease;
-}
-
-/* Rotated icon when folder is expanded (downwards triangle) */
-.folder-tree .folder.active::before {
-    content: '\25BC'; /* Down triangle (▼) */
-}
-
-/* Hide the subfolder list by default */
-.folder-tree .subfolder-list {
-    display: none;
-    padding-left: 20px;
-}
-
-/* Show subfolders when parent folder is active */
-.folder-tree .folder.active + .subfolder-list {
-    display: block;
-}
-
-/* Folder tree toggle icon (arrow) */
-.folder-tree .folder {
-    display: inline-flex;
-    align-items: center;
-}
-
-/* Add some padding to file and folder items */
-.folder-tree .folder, .folder-tree .file {
-    padding: 5px 0;
-}
-
-/* Optional - Customize the background and color for files */
-.folder-tree .file {
-    color: #666;
-}
-
-.folder-tree .file:hover {
-    background-color: #f0f8ff;
-    color: #0056b3;
-}
-
-/* Optional: Styling for the scroll bar */
-.folder-tree::-webkit-scrollbar {
-    width: 10px;
-}
-
-.folder-tree::-webkit-scrollbar-thumb {
-    background-color: #ccc;
-    border-radius: 10px;
-}
-
-.folder-tree::-webkit-scrollbar-thumb:hover {
-    background-color: #007bff;
-}
-
-
-
         </style>
     </head>
 
@@ -588,7 +488,13 @@
 
 
     <main id="main" class="main">
-        
+        <div class="pagetitle">
+        <h1>File Management</h1>
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="home.php">Home</a></li>
+            <li class="breadcrumb-item active">File Management</li>
+        </ol>
+    </div>
         </div><!-- End Page Title -->
 
         <!-- Search Bar and Filter Options -->
@@ -972,10 +878,8 @@
     </script>
 
         
-    
-
-    <!-- Breadcrumb Navigation -->
-    <div class="breadcrumb-container mb-3">
+      <!-- Breadcrumb Navigation -->
+      <div class="breadcrumb-container mb-3">
     <?php
     $breadcrumbs = [];
     $relative_path = str_replace($base_directory, '', $current_directory); // Get relative path from base
@@ -991,329 +895,705 @@
         }
     }
     ?>
+
+  
+
+<!-- Action Buttons -->
+<div class="action-button-container" style="display: none;">
+    <!-- Delete Selected -->
+    <button type="button" class="btn btn-danger" id="deleteSelectedBtn">Delete Selected</button>
+    
+    <!-- Move to Trash -->
+    <button type="button" class="btn btn-warning" id="moveToTrashBtn">Move to Trash</button>
+
+    <!-- Add Tag -->
+    <input type="text" id="tagInput" placeholder="Add tag to file/folder" style="display: none; margin-right: 10px;">
+    <button type="button" class="btn btn-primary" id="addTagBtn" style="display: none;">Add Tag</button>
+
+    <!-- Upload Selected -->
+    <!--  <button type="button" class="btn btn-success" id="uploadSelectedBtn">Upload Selected</button>-->
 </div>
 
 
-    <div class="row">
-        <!-- Button to toggle the folder tree -->
-        <div class="col-md-12 mb-3">
-            <button id="toggleFolderTreeBtn" class="btn btn-primary">Show Folder Tree</button>
-        </div>
+    <!-- SCRIPT FOR BULK DELETE-->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Get references to the elements
+    const actionButtonContainer = document.querySelector('.action-button-container');
+    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+    const deleteSelectedBtn = document.querySelector('#deleteSelectedBtn');
 
-        <!-- Folder Tree (Left Column) -->
-        <div class="col-md-4" id="folderTreeContainer" style="display: none;">
-            <div class="folder-tree">
-                <ul>
-                    <?php
-                    // Function to recursively list directories and files
-                    function displayFolders($current_directory) {
-                        $items = array_filter(scandir($current_directory), function ($item) use ($current_directory) {
-                            return $item !== '.' && $item !== '..' && $item !== '.DS_Store' && file_exists($current_directory . '/' . $item);
-                        });
+    // Function to toggle the visibility of the action button
+    function toggleActionButton() {
+        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+        actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+    }
 
-                        foreach ($items as $item) {
-                            $item_path = $current_directory . '/' . $item;
-                            $is_dir = is_dir($item_path);
-                            $item_type = $is_dir ? 'folder' : 'file';
-                            echo '<li>';
-                            
-                            if ($is_dir) {
-                                echo '<span class="folder" onclick="toggleFolder(this)">';
-                                echo '<i class="fas fa-folder"></i> ' . htmlspecialchars($item);
-                                echo '</span>';
-                                echo '<ul class="subfolder-list">';
-                                displayFolders($item_path); // Recursively display subfolders
-                                echo '</ul>';
-                            } else {
-                                echo '<span class="file">';
-                                echo '<i class="fas fa-file"></i> ' . htmlspecialchars($item);
-                                echo '</span>';
-                            }
-                            
-                            echo '</li>';
-                        }
-                    }
+    // Add event listeners to all checkboxes
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', toggleActionButton);
+    });
 
-                    // Display the tree structure starting from the current directory
-                    displayFolders($current_directory);
-                    ?>
-                </ul>
-            </div>
-        </div>
+    // Run once to ensure the button's initial state is correct
+    toggleActionButton();
 
-        <!-- Table (Right Column) -->
-        <div class="col-md-8">
-            <div class="table-responsive">
-                <table class="datatable table table-hover table-striped" id="fileTable">
-                    <thead>
-                        <tr>
-                            <th><input type="checkbox" id="selectAllCheckbox"></th>
-                            <th>File/Folder Name</th>
-                            <th>Type</th>
-                            <th>Uploader</th>
-                            <th class="file-path-column">File Path</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($_GET['search'])): ?>
-                            <?php
-                            // Ensure `.DS_Store` is excluded consistently
-                            $items = array_filter(scandir($current_directory), function ($item) use ($current_directory) {
-                                return $item !== '.' && $item !== '..' && $item !== '.DS_Store' && file_exists($current_directory . '/' . $item);
-                            });
+    // Bulk deletion logic with alert and confirmation
+    deleteSelectedBtn.addEventListener('click', async function() {
+        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
 
-        foreach ($items as $item):
-            $item_path = $current_directory . '/' . $item;
-            $is_dir = is_dir($item_path);
-            $item_type = $is_dir ? 'folder' : 'file';
-            $web_url = convertFilePathToURL($item_path); // Convert the file path to a web URL
-        ?>
+        if (selectedCheckboxes.length === 0) {
+            alert('No files or folders selected for deletion.');
+            return;
+        }
+
+        // Collect the names of all selected files/folders
+        const selectedItems = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            return row.querySelector('.file-folder-link').textContent.trim(); // Get the file or folder name
+        });
+
+        // Alert the list of selected items once
+        alert(`The following files/folders are selected for deletion:\n\n${selectedItems.join('\n')}`);
+
+        // Create a confirmation message
+        const confirmationMessage = `Are you sure you want to delete these files/folders?`;
+
+        if (!confirm(confirmationMessage)) {
+            return; // Exit if the user cancels
+        }
+
+        // If confirmed, send delete requests for all selected items
+        const deletionPromises = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            const filePath = row.getAttribute('data-path'); // Get the file path
+            const fileName = row.querySelector('.file-folder-link').textContent.trim(); // Get the file or folder name
+
+            // Make an async request to delete the file/folder
+            return deleteMedia(filePath, fileName);
+        });
+
+        try {
+            // Wait for all deletions to complete
+            const results = await Promise.all(deletionPromises);
+
+            // Filter success and failure messages
+            const successCount = results.filter(result => result.status === 'success').length;
+            const errorCount = results.length - successCount;
+
+            // Alert success message once
+            alert(`Deletion complete. ${successCount} item(s) deleted successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to delete.` : ''}`);
+
+            // Optionally reload the page or update the UI
+            location.reload();
+        } catch (error) {
+            console.error('Error during deletion:', error);
+            alert('An unexpected error occurred during deletion.');
+        }
+    });
+
+    // Function to handle the deletion request
+    async function deleteMedia(filePath, fileName) {
+        try {
+            const response = await fetch('deleteMedia.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filepath: filePath, fileName: fileName }),
+            });
+
+            return await response.json(); // Parse the JSON response
+        } catch (error) {
+            console.error(`Error deleting file ${fileName}:`, error);
+            return { status: 'error', message: 'Network error during deletion.' };
+        }
+    }
+});
+</script>
+
+
+<!-- SCRIPT TRASH-->
+<script>
+
+document.addEventListener("DOMContentLoaded", function() {
+    // Get references to the elements
+    const actionButtonContainer = document.querySelector('.action-button-container');
+    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+    const moveToTrashBtn = document.querySelector('#moveToTrashBtn');
+
+    // Function to toggle the visibility of the action button
+    function toggleActionButton() {
+        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+        actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+    }
+
+    // Add event listeners to all checkboxes
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', toggleActionButton);
+    });
+
+    // Run once to ensure the button's initial state is correct
+    toggleActionButton();
+
+    // Bulk move-to-trash logic with alert and confirmation
+    moveToTrashBtn.addEventListener('click', async function() {
+        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
+
+        if (selectedCheckboxes.length === 0) {
+            alert('No files or folders selected to move to trash.');
+            return;
+        }
+
+        // Collect the names of all selected files/folders
+        const selectedItems = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            return row.querySelector('.file-folder-link').textContent.trim(); // Get the file or folder name
+        });
+
+        // Alert the list of selected items once
+        alert(`The following files/folders are selected to move to trash:\n\n${selectedItems.join('\n')}`);
+
+        // Create a confirmation message
+        const confirmationMessage = `Are you sure you want to move these files/folders to trash?`;
+
+        if (!confirm(confirmationMessage)) {
+            return; // Exit if the user cancels
+        }
+
+        // If confirmed, send move-to-trash requests for all selected items
+        const trashPromises = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            const filePath = row.getAttribute('data-path'); // Get the file path
+            const fileName = row.querySelector('.file-folder-link').textContent.trim(); // Get the file or folder name
+
+            // Make an async request to move the file/folder to trash
+            return moveToTrash(filePath, fileName);
+        });
+
+        try {
+            // Wait for all moves to complete
+            const results = await Promise.all(trashPromises);
+
+            // Filter success and failure messages
+            const successCount = results.filter(result => result.status === 'success').length;
+            const errorCount = results.length - successCount;
+
+            // Alert success message once
+            alert(`Move to trash complete. ${successCount} item(s) moved successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to move.` : ''}`);
+
+            // Optionally reload the page or update the UI
+            location.reload();
+        } catch (error) {
+            console.error('Error during move to trash:', error);
+            alert('An unexpected error occurred while moving items to trash.');
+        }
+    });
+
+    // Function to handle the move-to-trash request
+    async function moveToTrash(filePath, fileName) {
+        try {
+            const response = await fetch('moveToTrash.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filepath: filePath, fileName: fileName }),
+            });
+
+            return await response.json(); // Parse the JSON response
+        } catch (error) {
+            console.error(`Error moving file ${fileName} to trash:`, error);
+            return { status: 'error', message: 'Network error during move to trash.' };
+        }
+    }
+});
+
+
+
+</script>
+
+
+<!-- SCRIPT ADD TAG-->
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+    // Get references to the elements
+    const actionButtonContainer = document.querySelector('.action-button-container');
+    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+    const addTagBtn = document.querySelector('#addTagBtn');
+    const tagInput = document.querySelector('#tagInput');
+
+    // Function to toggle the visibility of the action button and input
+    function toggleActionButton() {
+        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+        actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+        tagInput.style.display = isAnyCheckboxSelected ? 'inline-block' : 'none';
+        addTagBtn.style.display = isAnyCheckboxSelected ? 'inline-block' : 'none';
+    }
+
+    // Add event listeners to all checkboxes
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', toggleActionButton);
+    });
+
+    // Run once to ensure the button's initial state is correct
+    toggleActionButton();
+
+    // Add Tag button logic
+    addTagBtn.addEventListener('click', async function() {
+        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
+        const tag = tagInput.value.trim();
+
+        if (selectedCheckboxes.length === 0) {
+            alert('No files or folders selected to add a tag.');
+            return;
+        }
+
+        if (!tag) {
+            alert('Please enter a tag.');
+            return;
+        }
+
+        // Collect the file paths and names of all selected files/folders
+        const selectedItems = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            return {
+                filePath: row.getAttribute('data-path'),
+                fileName: row.querySelector('.file-folder-link').textContent.trim()
+            };
+        });
+
+        // Send the tag request for each selected item
+        const tagPromises = selectedItems.map(item => addTagToItem(item.filePath, item.fileName, tag));
+
+        try {
+            // Wait for all tag requests to complete
+            const results = await Promise.all(tagPromises);
+
+            // Filter success and failure messages
+            const successCount = results.filter(result => result.status === 'success').length;
+            const errorCount = results.length - successCount;
+
+            // Alert success message once
+            alert(`Tagging complete. ${successCount} item(s) tagged successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to tag.` : ''}`);
+
+            // Optionally clear the tag input and reload the page
+            tagInput.value = '';
+            location.reload();
+        } catch (error) {
+            console.error('Error during tagging:', error);
+            alert('An unexpected error occurred while tagging.');
+        }
+    });
+
+    // Function to handle the add tag request
+    async function addTagToItem(filePath, fileName, tag, fileSize, fileType) {
+    // Determine the file type
+    const fileExtension = fileName.split('.').pop().toLowerCase();
+    let type = '';
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) type = 'image';
+    else if (['mp3', 'wav', 'aac'].includes(fileExtension)) type = 'audio';
+    else if (['mp4', 'mkv', 'avi'].includes(fileExtension)) type = 'video';
+    else type = 'unknown';
+
+    if (type === 'unknown') {
+        alert(`Unsupported file type for ${fileName}.`);
+        return;
+    }
+
+    try {
+        const response = await fetch('addTag.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                filepath: filePath,
+                fileName: fileName,
+                tag: tag,
+                type: type,
+                fileSize: fileSize,
+                fileType: fileType,
+            }),
+        });
+
+        const result = await response.json();
+        console.log(result);
+        return result;
+    } catch (error) {
+        console.error(`Error adding tag:`, error);
+        return { status: 'error', message: 'Network error during tagging.' };
+    }
+}
+
+});
+
+</script>
+
+
+
+
+
+<!-- SCRIPT FOR BULK UPLOAD-->
+<script>
+  
+document.addEventListener("DOMContentLoaded", function () {
+    // Get references to the elements
+    const actionButtonContainer = document.querySelector('.action-button-container');
+    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+    const uploadSelectedBtn = document.querySelector('#uploadSelectedBtn');
+
+    // Function to toggle the visibility of the action button
+    function toggleActionButton() {
+        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+        actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+    }
+
+    // Add event listeners to all checkboxes
+    rowCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', toggleActionButton);
+    });
+
+    // Run once to ensure the button's initial state is correct
+    toggleActionButton();
+
+    // Bulk upload logic for files/folders
+    uploadSelectedBtn.addEventListener('click', async function () {
+        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
+
+        if (selectedCheckboxes.length === 0) {
+            alert('No files or folders selected for upload.');
+            return;
+        }
+
+        // Collect selected file/folder metadata
+        const selectedItems = selectedCheckboxes.map(checkbox => {
+            const row = checkbox.closest('tr');
+            const name = row.querySelector('.file-folder-link').textContent.trim();
+            const type = row.cells[2].textContent.trim(); // Assuming column 2 has "File" or "Folder"
+            const path = row.getAttribute('data-path');
+
+            return { filename: name, filetype: type, filepath: path };
+        });
+
+        try {
+            // Send data to the server
+            const response = await fetch('uploadSelected.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ selectedItems }),
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert('Files and folders uploaded successfully.');
+                location.reload();
+            } else {
+                alert(`Error uploading files/folders:\n${result.message}`);
+            }
+        } catch (error) {
+            console.error('Error during upload:', error);
+            alert('An unexpected error occurred during the upload.');
+        }
+    });
+});
+
+
+</script>
+
+
+
+<style>
+     .action-button-container {
+        margin-top: 10px;
+    }
+    .btn-danger {
+        background-color: #dc3545;
+        color: #fff;
+        border: none;
+        padding: 10px 15px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-danger:hover {
+        background-color: #c82333;
+    }
+    .btn-warning {
+        background-color: #ffc107;
+        color: #212529;
+        border: none;
+        padding: 10px 15px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-warning:hover {
+        background-color: #e0a800;
+    }
+    .btn-primary {
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        padding: 10px 15px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+    #tagInput {
+        padding: 5px;
+        font-size: 14px;
+    }
+    
+</style>
+
+
+        <div class="table-responsive">
+            <table class="datatable table table-hover table-striped" id="fileTable">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAllCheckbox"></th>
+                        <th>File/Folder Name</th>
+                        <th>Type</th>
+                    
+                        <th class="file-path-column">File Path</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+
+
+
+                <?php if (empty($_GET['search'])): ?>
+    <?php
+    // Ensure `.DS_Store` is excluded consistently
+    $items = array_filter(scandir($current_directory), function ($item) use ($current_directory) {
+        return $item !== '.' && $item !== '..' && $item !== '.DS_Store' && file_exists($current_directory . '/' . $item);
+    });
+
+    foreach ($items as $item):
+        $item_path = $current_directory . '/' . $item;
+        $is_dir = is_dir($item_path);
+        $item_type = $is_dir ? 'folder' : 'file';
+        $web_url = convertFilePathToURL($item_path); // Convert the file path to a web URL
+    ?>
+        <tr data-path="<?php echo htmlspecialchars($item_path, ENT_QUOTES, 'UTF-8'); ?>">
+            <td><input type="checkbox" class="rowCheckbox"></td>
+            <td>
+                <?php if ($is_dir): ?>
+                    <!-- Folder -->
+                    <a href="?dir=<?php echo urlencode($item_path); ?>" class="file-folder-link" 
+                       onclick="recordActivity('<?php echo addslashes($item); ?>', 'folder', '<?php echo htmlspecialchars($item_path); ?>')">
+                        <?php echo htmlspecialchars($item); ?>
+                    </a>
+                <?php else: ?>
+                    <!-- File -->
+                    <a href="javascript:void(0);" class="file-folder-link" 
+                       data-url="<?php echo htmlspecialchars($web_url); ?>" 
+                       data-type="<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>" 
+                       onclick="recordActivity('<?php echo addslashes($item); ?>', 'file', '<?php echo htmlspecialchars($item_path); ?>'); openModal('<?php echo htmlspecialchars($web_url); ?>', '<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>')">
+                        <?php echo htmlspecialchars($item); ?>
+                    </a>
+                <?php endif; ?>
+            </td>
+            <td><?php echo $is_dir ? 'Folder' : 'File'; ?></td>
+            <td class="file-path-column">
+                <div class="file-path-wrapper">
+                    <a href="<?php echo htmlspecialchars($web_url); ?>" target="_blank" class="file-path">
+                        <?php echo htmlspecialchars($web_url); ?>
+                    </a>
+                </div>
+            </td>
+            <td>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($item); ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-cogs"></i> Actions
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($item); ?>">
+
+                    <li>
+                    <a class="dropdown-item" href="javascript:void(0);" onclick="publishMedia('<?php echo htmlspecialchars($item_path); ?>')">
+    <i class="fas fa-cloud-upload-alt"></i> Publish
+</a>
+
+            </li>
+                        
+                        <li>
+                            <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')">
+                                <i class="fas fa-i-cursor"></i> Rename
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($item_path); ?>')">
+                                <i class="fas fa-copy"></i> Copy
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($item_path); ?>')">
+                                <i class="fas fa-download"></i> Download
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($item_path, ENT_QUOTES, 'UTF-8'); ?>', '<?php echo htmlspecialchars($item, ENT_QUOTES, 'UTF-8'); ?>')">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+<?php else: ?>
+                <?php if (!empty($searchResults['folders']) || !empty($searchResults['files'])): ?>
+                    <?php foreach ($searchResults['folders'] as $folder): ?>
                         <tr>
                             <td><input type="checkbox" class="rowCheckbox"></td>
                             <td>
-                                <?php if ($is_dir): ?>
-                                    <!-- Folder -->
-                                    <a href="?dir=<?php echo urlencode($item_path); ?>" class="file-folder-link" 
-                                    onclick="recordActivity('<?php echo addslashes($item); ?>', 'folder', '<?php echo htmlspecialchars($item_path); ?>')">
-                                        <?php echo htmlspecialchars($item); ?>
-                                    </a>
-                                <?php else: ?>
-                                    <!-- File -->
-    <a href="javascript:void(0);" class="file-folder-link" 
-    data-url="<?php echo htmlspecialchars($web_url); ?>" 
-    data-type="<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>" 
-    onclick="recordActivity('<?php echo addslashes($item); ?>', 'file', '<?php echo htmlspecialchars($item_path); ?>'); openModal('<?php echo htmlspecialchars($web_url); ?>', '<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>')">
-        <?php echo htmlspecialchars($item); ?>
-    </a>
-                                <?php endif; ?>
+                                <a href="?dir=<?php echo urlencode($folder['filepath']); ?>" 
+                                   onclick="recordActivity('<?php echo addslashes($folder['filename']); ?>', 'folder')">
+                                    <?php echo htmlspecialchars($folder['filename']); ?>
+                                </a>
                             </td>
-                            <td><?php echo $is_dir ? 'Folder' : 'File'; ?></td>
+                            <td>Folder</td>
                             <td>Unknown</td>
                             <td class="file-path-column">
                                 <div class="file-path-wrapper">
-                                    <a href="<?php echo htmlspecialchars($web_url); ?>" target="_blank" class="file-path">
-                                        <?php echo htmlspecialchars($web_url); ?>
+                                    <a href="<?php echo htmlspecialchars(convertFilePathToURL($folder['filepath'])); ?>" target="_blank" class="file-path">
+                                        <?php echo htmlspecialchars(convertFilePathToURL($folder['filepath'])); ?>
                                     </a>
                                 </div>
                             </td>
-                            
+                            <td>Creative</td>
                             <td>
-                            <div class="dropdown">
-        <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($item); ?>" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="fas fa-cogs"></i> Actions
-        </button>
-        <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($item); ?>">
-            <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')">
-                    <i class="fas fa-i-cursor"></i> Rename
-                </a>
-            </li>
-            <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                    <i class="fas fa-copy"></i> Copy
-                </a>
-            </li>
-            <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                    <i class="fas fa-download"></i> Download
-                </a>
-            </li>
-            <!-- Add the Publish button -->
-            <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="publishMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')">
-                    <i class="fas fa-upload"></i> Publish
-                </a>
-            </li>
-            <li>
-        <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($item_path, ENT_QUOTES, 'UTF-8'); ?>', '<?php echo htmlspecialchars($item, ENT_QUOTES, 'UTF-8'); ?>')">
-            <i class="fas fa-trash"></i> Delete
-        </a>
-    </li>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($folder['filename']); ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-cogs"></i> Actions
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($folder['filename']); ?>">
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($folder['filepath']); ?>', '<?php echo htmlspecialchars($folder['filename']); ?>')">
+                                                <i class="fas fa-i-cursor"></i> Rename
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($folder['filepath']); ?>')">
+                                                <i class="fas fa-copy"></i> Copy
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($folder['filepath']); ?>')">
+                                                <i class="fas fa-download"></i> Download
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($folder['filepath'], ENT_QUOTES, 'UTF-8'); ?>', '<?php echo htmlspecialchars($folder['filename'], ENT_QUOTES, 'UTF-8'); ?>')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
 
-        
-        </ul>
-    </div>
-
-            </li>
-        </ul>
-    </div>
-
+                    <?php foreach ($searchResults['files'] as $file): ?>
+                        <tr>
+                            <td><input type="checkbox" class="rowCheckbox"></td>
+                            <td>
+                                <a href="javascript:void(0);" class="file-folder-link" 
+                                   data-url="<?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>" 
+                                   data-type="<?php echo htmlspecialchars(pathinfo($file['filepath'], PATHINFO_EXTENSION)); ?>" 
+                                   onclick="openModal('<?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>', '<?php echo htmlspecialchars(pathinfo($file['filepath'], PATHINFO_EXTENSION)); ?>')">
+                                    <?php echo htmlspecialchars($file['filename']); ?>
+                                </a>
+                            </td>
+                            <td><?php echo htmlspecialchars($file['filetype']); ?></td>
+                            <td>Database</td>
+                            <td class="file-path-column">
+                                <div class="file-path-wrapper">
+                                    <a href="<?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>" target="_blank" class="file-path">
+                                        <?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>
+                                    </a>
+                                </div>
+                            </td>
+                            <td>Creative</td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-danger dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-cogs"></i> Actions
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        
+                                            
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-copy"></i> Copy</a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-download"></i> Download</a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($file['filepath']); ?>', '<?php echo htmlspecialchars($file['filename']); ?>')"><i class="fas fa-trash"></i> Delete</a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
-                <?php if (!empty($searchResults['folders']) || !empty($searchResults['files'])): ?>
-        <?php foreach ($searchResults['folders'] as $folder): ?>
-            <tr>
-                <td><input type="checkbox" class="rowCheckbox"></td>
-                <td>
-                    <a href="?dir=<?php echo urlencode($folder['filepath']); ?>" 
-                    onclick="recordActivity('<?php echo addslashes($folder['filename']); ?>', 'folder')">
-                        <?php echo htmlspecialchars($folder['filename']); ?>
-                    </a>
-                </td>
-                <td>Folder</td>
-                <td>Unknown</td>
-                <td class="file-path-column">
-                    <div class="file-path-wrapper">
-                        <a href="<?php echo htmlspecialchars(convertFilePathToURL($folder['filepath'])); ?>" target="_blank" class="file-path">
-                            <?php echo htmlspecialchars(convertFilePathToURL($folder['filepath'])); ?>
-                        </a>
-                    </div>
-                </td>
-                <td>Creative</td>
-                <td>
-                    <div class="dropdown">
-        <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($item); ?>" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="fas fa-cogs"></i> Actions
-        </button>
-        <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($item); ?>">
-            <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')">
-                    <i class="fas fa-i-cursor"></i> Rename
-                </a>
-            </li>
-            <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                    <i class="fas fa-copy"></i> Copy
-                </a>
-            </li>
-            <li>
-                <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                    <i class="fas fa-download"></i> Download
-                </a>
-            </li>
-            <li>
-                <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')">
-                    <i class="fas fa-trash"></i> Delete
-                </a>
-            </li>
-        </ul>
-    </div>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-
-        <?php foreach ($searchResults['files'] as $file): ?>
-            <tr>
-                <td><input type="checkbox" class="rowCheckbox"></td>
-                <td>
-                    <a href="javascript:void(0);" class="file-folder-link" 
-                    data-url="<?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>" 
-                    data-type="<?php echo htmlspecialchars(pathinfo($file['filepath'], PATHINFO_EXTENSION)); ?>" 
-                    onclick="openModal('<?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>', '<?php echo htmlspecialchars(pathinfo($file['filepath'], PATHINFO_EXTENSION)); ?>')">
-                        <?php echo htmlspecialchars($file['filename']); ?>
-                    </a>
-                </td>
-                <td><?php echo htmlspecialchars($file['filetype']); ?></td>
-                <td>Database</td>
-                <td class="file-path-column">
-                    <div class="file-path-wrapper">
-                        <a href="<?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>" target="_blank" class="file-path">
-                            <?php echo htmlspecialchars(convertFilePathToURL($file['filepath'])); ?>
-                        </a>
-                    </div>
-                </td>
-                <td>Creative</td>
-                <td>
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-danger dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-cogs"></i> Actions
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li>
-                                <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-copy"></i> Copy</a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($file['filepath']); ?>')"><i class="fas fa-download"></i> Download</a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($file['filepath']); ?>', '<?php echo htmlspecialchars($file['filename']); ?>')"><i class="fas fa-trash"></i> Delete</a>
-                            </li>
-                        </ul>
-                    </div>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <tr><td colspan="7">No matching files or folders found.</td></tr>
-    <?php endif; ?>
-
-
-
-
+                    <tr><td colspan="7">No matching files or folders found.</td></tr>
                 <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+            <?php endif; ?>
+        </tbody>
+    </table>
+</div>
+
+
 
 
 
     <script>
 
 
-// JavaScript to toggle folder tree visibility and adjust the table width
-document.getElementById("toggleFolderTreeBtn").addEventListener("click", function() {
-    var folderTreeContainer = document.getElementById("folderTreeContainer");
-    var tableContainer = document.getElementById("tableContainer");
-
-    // Toggle the display style of the folder tree
-    if (folderTreeContainer.style.display === "none") {
-        folderTreeContainer.style.display = "block";  // Show folder tree
-        tableContainer.classList.remove("col-md-12"); // Remove full width for table
-        tableContainer.classList.add("col-md-8"); // Set table width to 8 columns (when tree is visible)
-        this.innerText = "Hide Folder Tree"; // Change button text to "Hide Folder Tree"
-    } else {
-        folderTreeContainer.style.display = "none";  // Hide folder tree
-        tableContainer.classList.remove("col-md-8"); // Remove the previous width for table
-        tableContainer.classList.add("col-md-12"); // Set table width to 12 columns (full width)
-        this.innerText = "Show Folder Tree"; // Change button text to "Show Folder Tree"
-    }
+document.getElementById('selectAllCheckbox').addEventListener('click', function() {
+    // Get all checkboxes with the class 'rowCheckbox'
+    const checkboxes = document.querySelectorAll('.rowCheckbox');
+    
+    // Set each checkbox's checked state based on the 'selectAllCheckbox' state
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = document.getElementById('selectAllCheckbox').checked;
+    });
 });
 
-// Function to toggle folder visibility and triangle icon
-function toggleFolder(element) {
-    // Toggle the active class to show/hide subfolders and change the triangle icon
-    element.classList.toggle('active');
+
+
+
+//PUBLISH SCRIPT
+async function publishMedia(filepath) {
+    try {
+        const response = await fetch('publishMedia.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filepath: filepath })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            alert('File published successfully!');
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error publishing file:', error);
+        alert('An error occurred while publishing the file.');
+    }
 }
 
 
-    function publishMedia(fileName, filePath) {
-        if (confirm("Are you sure you want to publish this item?")) {
-            var data = {
-                filename: fileName.trim(), // File name only
-                filepath: filePath.trim()  // Full file path
-            };
-
-            console.log("DEBUG: Data being sent to server:", data); // Log the data being sent
-
-            $.ajax({
-                url: './actions/publish.php',
-                type: 'POST',
-                data: data,
-                success: function(response) {
-                    console.log("Response from server:", response); // Log raw response
-                    try {
-                        var jsonResponse = JSON.parse(response); // Parse JSON response
-                        if (jsonResponse.status === 'success') {
-                            alert('File has been successfully published!');
-                            location.reload(); // Reload the page to reflect the changes
-                        } else {
-                            alert('Error: ' + jsonResponse.message);
-                        }
-                    } catch (e) {
-                        console.error("Error parsing response:", e);
-                        alert("Error: Failed to parse response. Check the console for details.");
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error("Publishing failed:", status, error);
-                    alert('Error: Could not publish the item. Check console for details.');
-                }
-            });
-        }
-    }
 
 
 
@@ -1663,34 +1943,46 @@ function toggleFolder(element) {
 
 
     function deleteMedia(filePath, fileName) {
-        console.log("Attempting to delete:", filePath, fileName); // Debugging log
+    console.log("Attempting to delete:", filePath, fileName); // Debugging log
 
-        if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
-            return;
-        }
-
-        // Send a POST request using fetch with JSON data
-        fetch('deleteMedia.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ filepath: filePath, fileName: fileName })
-        })
-        .then(response => response.json()) // Parse the JSON response
-        .then(data => {
-            if (data.status === 'success') {
-                alert('File deleted successfully!');
-                location.reload(); // Refresh the page to update the file listing
-            } else {
-                alert('Error: ' + (data.message || 'Unable to delete file.'));
-            }
-        })
-        .catch(error => {
-            console.error("Error:", error); // Debugging log
-            alert('An error occurred while trying to delete the file.');
-        });
+    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+        return;
     }
+
+    // Send a POST request using fetch with JSON data
+    fetch('deleteMedia.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filepath: filePath, fileName: fileName })
+    })
+    .then(response => response.json()) // Parse the JSON response
+    .then(data => {
+        if (data.status === 'success') {
+            alert('File deleted successfully!');
+
+            // Dynamically update the UI
+            const row = document.querySelector(`tr[data-path="${filePath}"]`);
+            if (row) {
+                row.remove(); // Remove the row from the DOM
+            }
+
+            // Update action button state
+            const actionButtonContainer = document.querySelector('.action-button-container');
+            const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+            const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+            actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+        } else {
+            alert('Error: ' + (data.message || 'Unable to delete file.'));
+        }
+    })
+    .catch(error => {
+        console.error("Error:", error); // Debugging log
+        alert('An error occurred while trying to delete the file.');
+    });
+}
+
 
 
 
@@ -1807,6 +2099,8 @@ function toggleFolder(element) {
 
 
     </body>
+    <script src="assets/js/main.js"></script>
+
     <?php
     require 'footer.php';
     ?>

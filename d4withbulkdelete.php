@@ -6,7 +6,7 @@
 
     // Handle file upload and redirect logic
     // Set the base directory path
-    $base_directory = '/Volumes/creative/';
+    $base_directory = '/Volumes/creative';
     $current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
 
     // Function to convert file path to URL

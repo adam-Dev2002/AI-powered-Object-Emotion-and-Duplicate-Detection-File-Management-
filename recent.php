@@ -4,7 +4,7 @@ require 'login-check.php';
 require 'config.php';
 
 // Set the base directory path
-$base_directory = '/Volumes/creative/greyhoundhub/FU_Events';
+$base_directory = '/Volumes/creative/Hara All About';
 $current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
 
 // Function to convert file path to URL
@@ -59,6 +59,74 @@ function convertTimestamp($timestamp) {
     <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <style>
+        /* Updated Grid View */
+.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Dynamically fills the width */
+    gap: 20px; Even spacing between grid items
+    padding: 10px;
+    width: 100%; /* Ensures the grid spans the full width */
+    margin: 0; /* Removes unnecessary margin */
+    box-sizing: border-box; /* Ensures padding is included in the width */
+}
+
+.grid-item {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    text-align: center;
+    transition: transform 0.3s;
+}
+
+.grid-item:hover {
+    transform: translateY(-5px);
+}
+
+.grid-item img, .grid-item video {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+/* Ensure container uses full page width */
+.container {
+    max-width: 100%; /* Remove any container width restrictions */
+    padding-left: 10px;
+    padding-right: 10px;
+    margin: 0 auto; /* Center the container if necessary */
+}
+
+        /* Updated Grid View */
+.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px; /* Even spacing between grid items */
+    padding: 10px;
+    margin: 0 auto; /* Center the grid container */
+}
+
+.grid-item {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    text-align: center;
+    transition: transform 0.3s;
+}
+
+.grid-item:hover {
+    transform: translateY(-5px);
+}
+
+.grid-item img, .grid-item video {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
         .grid-view {
             display: flex;
             flex-wrap: wrap;
@@ -297,6 +365,8 @@ function switchToGridView() {
     document.getElementById('listViewBtn').classList.remove("active");
 }
 </script>
+    <script src="assets/js/main.js"></script>
+
 <?php require 'footer.php'; ?>
 </body>
 </html>

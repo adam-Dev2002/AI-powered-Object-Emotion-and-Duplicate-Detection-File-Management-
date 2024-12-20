@@ -3,7 +3,6 @@ import os.path
 import pickle
 import string
 from collections.abc import Iterable
-from pathlib import Path
 from typing import Any, Callable, cast, List, Optional, Tuple, Union
 
 from PIL import Image
@@ -61,10 +60,10 @@ class LSUN(VisionDataset):
     ``pip install lmdb``
 
     Args:
-        root (str or ``pathlib.Path``): Root directory for the database files.
+        root (string): Root directory for the database files.
         classes (string or list): One of {'train', 'val', 'test'} or a list of
             categories to load. e,g. ['bedroom_train', 'church_outdoor_train'].
-        transform (callable, optional): A function/transform that takes in a PIL image
+        transform (callable, optional): A function/transform that  takes in an PIL image
             and returns a transformed version. E.g, ``transforms.RandomCrop``
         target_transform (callable, optional): A function/transform that takes in the
             target and transforms it.
@@ -72,7 +71,7 @@ class LSUN(VisionDataset):
 
     def __init__(
         self,
-        root: Union[str, Path],
+        root: str,
         classes: Union[str, List[str]] = "train",
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,

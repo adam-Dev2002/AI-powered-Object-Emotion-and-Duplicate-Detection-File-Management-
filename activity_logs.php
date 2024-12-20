@@ -101,7 +101,7 @@ foreach ($logs as &$log) {
 </main>
 
 <?php require 'footer.php'; ?>
-
+<script src="assets/js/main.js"></script>
 <a href="#" class="back-to-top"><i class="bi bi-arrow-up-short"></i></a>
 
 </body>

@@ -1,33 +1,35 @@
 <?php
-$base_directory = '/Volumes/creative/greyhoundhub';
+$base_directory = '/Volumes/creative/Hara All About/Photoshoots';
 
 // Define file extensions for categories
 $file_types = [
     'Images' => ['jpg', 'jpeg', 'png', 'gif'],
     'Videos' => ['mp4', 'mov', 'avi', 'mkv'],
     'Audios' => ['mp3', 'wav', 'flac'],
-    'Others' => [] // Everything else falls into this category
+    'Others' => [] // Everything else
 ];
 
 // Function to categorize and calculate file sizes
 function categorizeFiles($base_directory, $file_types) {
     $categories = array_fill_keys(array_keys($file_types), 0); // Initialize categories with 0 size
-    $categories['Others'] = 0; // Ensure 'Others' is included
     $total_files = 0; // Initialize total file counter
 
-    // Use `find` to scan the directory and gather files
-    $command = "find " . escapeshellarg($base_directory) . " -type f -exec ls -l {} +";
+    // Use `find` to scan files, output size and full path
+    $command = "find " . escapeshellarg($base_directory) . " -type f -exec stat -f '%z %N' {} +";
     $output = shell_exec($command);
 
     if ($output) {
         $lines = explode("\n", $output);
         foreach ($lines as $line) {
-            $parts = preg_split('/\s+/', $line);
-            if (count($parts) < 9) continue;
+            if (empty($line)) continue;
 
-            $file_size = (int)$parts[4]; // File size in bytes
-            $file_name = $parts[8];
-            $extension = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+            // Split size and file path
+            preg_match('/^(\d+)\s+(.+)$/', $line, $matches);
+            if (count($matches) !== 3) continue;
+
+            $file_size = (int)$matches[1]; // File size in bytes
+            $file_path = $matches[2];
+            $extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
 
             $total_files++; // Increment total file counter
 
@@ -98,3 +100,4 @@ function formatSize($bytes) {
 // Return the stats as JSON
 header('Content-Type: application/json');
 echo json_encode(getStorageStats($base_directory, $file_types));
+?>

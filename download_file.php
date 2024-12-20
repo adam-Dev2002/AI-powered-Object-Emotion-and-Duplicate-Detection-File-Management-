@@ -17,7 +17,7 @@ if (!file_exists($filePath)) {
 }
 
 // Validate the file path to prevent directory traversal attacks
-$baseDirectory = '/Volumes/creative/greyhoundhub'; // Adjust based on your directory structure
+$baseDirectory = '/Volumes/creative/Hara All About/Photoshoots'; // Adjust based on your directory structure
 $realBase = realpath($baseDirectory);
 $realFile = realpath($filePath);
 

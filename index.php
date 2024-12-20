@@ -259,38 +259,31 @@ require 'login-check.php';
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    // Fetch storage data dynamically from storage_stats.php
     fetch('storage_stats.php')
         .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to load storage statistics.');
-            }
+            if (!response.ok) throw new Error('Failed to load storage statistics.');
             return response.json();
         })
         .then(stats => {
-            const totalUsed = parseFloat(stats.used_space.split(' ')[0]);
+            const totalUsed = Object.values(stats.file_categories).reduce((acc, val) => acc + val, 0); // Sum all sizes
             const categories = stats.file_categories;
 
             const tbody = document.getElementById("storageAnalyticsBody");
             tbody.innerHTML = ""; // Clear existing content
 
-            // Function to get progress bar color based on file type
+            // Function to get progress bar color
             const getColorByFileType = (type) => {
-                type = type.toLowerCase();
-                if (["jpg", "jpeg", "png", "gif"].includes(type)) {
-                    return "#34a853"; // Green for images
-                } else if (["mp4", "mov"].includes(type)) {
-                    return "#db4437"; // Red for videos
-                } else if (["mp3", "wav"].includes(type)) {
-                    return "#ff8c00"; // Orange for audios
-                } else {
-                    return "#4285f4"; // Blue for others
+                switch (type.toLowerCase()) {
+                    case "images": return "#34a853"; // Green
+                    case "videos": return "#db4437"; // Red
+                    case "audios": return "#ff8c00"; // Orange
+                    default: return "#4285f4"; // Blue for Others
                 }
             };
 
             // Populate table rows
             for (const [type, size] of Object.entries(categories)) {
-                const percentageUsed = ((size / totalUsed) * 100).toFixed(2);
+                const percentageUsed = totalUsed > 0 ? ((size / totalUsed) * 100).toFixed(2) : 0;
                 const progressBarColor = getColorByFileType(type);
 
                 const row = `
@@ -317,6 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </tr>`;
         });
 });
+
 </script>
 
 
