@@ -107,9 +107,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 </ul><!-- End Notification Dropdown -->
             </li><!-- End Notifications -->
 
-            <!-- Profile -->
-            <li class="nav-item dropdown pe-3">
+          <!-- Profile -->
+          <li class="nav-item dropdown pe-3">
                 <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
+                    <img src="https://studentlogs.foundationu.com/Photo/<?php echo htmlspecialchars($user['employee_id'] ?? 'default'); ?>.JPG" 
+                         alt="Profile" class="rounded-circle" width="40" height="40"
+                         onerror="this.onerror=null; this.src='assets/img/default-profile.png';">
                     <span class="d-none d-md-block dropdown-toggle ps-2"><?php echo htmlspecialchars($user['name'] ?? 'Admin'); ?></span>
                 </a><!-- End Profile Image Icon -->
 
@@ -122,11 +125,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         <hr class="dropdown-divider">
                     </li>
                     <li>
-                        <a class="dropdown-item d-flex align-items-center" href="users-profile.php">
-                            <i class="bi bi-person"></i>
-                            <span>My Profile</span>
-                        </a>
-                    </li>
+    <a class="dropdown-item d-flex align-items-center" id="profileLink">
+        <i class="bi bi-person"></i>
+        <span>My Profile</span>
+    </a>
+</li>
+
+<script>
+    document.getElementById("profileLink").addEventListener("click", function() {
+        window.location.href = "users-profile.php";
+    });
+</script>
                     <li>
                         <hr class="dropdown-divider">
                     </li>
@@ -134,13 +143,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                         <hr class="dropdown-divider">
                     </li>
                     <li>
-                        <a class="dropdown-item d-flex align-items-center" href="logout.php">
-                            <i class="bi bi-box-arrow-right"></i>
-                            <span>Sign Out</span>
-                        </a>
+                    <a class="dropdown-item d-flex align-items-center" href="logout.php">
+    <i class="bi bi-box-arrow-right"></i>
+    <span>Sign Out</span>
+</a>
+
                     </li>
                 </ul><!-- End Profile Dropdown Items -->
             </li><!-- End Profile Nav -->
         </ul>
     </nav><!-- End Icons Navigation -->
 </header><!-- End Header -->
+

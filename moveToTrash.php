@@ -1,40 +1,44 @@
 <?php
-// Base directory for trash
-$base_directory = '/Volumes/creative/TRASH/';
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+include 'config.php';
 
-// Get the raw POST data
+// Updated base directory to reflect the new trash folder location
+$base_directory = '/Applications/XAMPP/xamppfiles/htdocs/TRASH/';
+
+// Updated to handle the new base URL for adjusting file paths
+function adjustFilePath($filePath) {
+    if (strpos($filePath, "http://localhost/") !== false) {
+        return str_replace("http://localhost/", "/Applications/XAMPP/xamppfiles/htdocs/", $filePath);
+    }
+    return $filePath;
+}
+
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Check if required parameters are provided
 if (isset($data['filepath']) && isset($data['fileName'])) {
-    $filePath = trim($data['filepath']);
+    $filePath = adjustFilePath(trim($data['filepath']));
     $fileName = trim($data['fileName']);
 
-    // Check if the trash directory exists, create it if not
     if (!is_dir($base_directory)) {
-        if (!mkdir($base_directory, 0777, true)) {
-            echo json_encode(['status' => 'error', 'message' => 'Failed to create trash directory.']);
-            exit;
-        }
+        mkdir($base_directory, 0777, true);
     }
 
-    // Sanitize the file name to prevent path traversal attacks
     $safeFileName = basename($fileName);
-
-    // Construct the new path in the trash directory
     $newPath = rtrim($base_directory, '/') . '/' . $safeFileName;
 
-    // Ensure the file exists before moving
     if (file_exists($filePath)) {
-        // Check if a file with the same name already exists in the trash
         if (file_exists($newPath)) {
-            // Append a unique suffix to the file name
             $fileInfo = pathinfo($safeFileName);
             $newPath = rtrim($base_directory, '/') . '/' . $fileInfo['filename'] . '_' . time() . '.' . $fileInfo['extension'];
         }
 
-        // Attempt to move the file
         if (rename($filePath, $newPath)) {
+            $sql = "DELETE FROM files WHERE filepath = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("s", $filePath);
+            $stmt->execute();
+
             echo json_encode(['status' => 'success', 'message' => 'File moved to trash successfully.', 'trashPath' => $newPath]);
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Failed to move the file to trash.']);

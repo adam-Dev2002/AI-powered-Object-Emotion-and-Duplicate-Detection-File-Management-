@@ -1,4 +1,4 @@
-#!/Users/capstone2024-2025/Downloads/greyhound-hub-creative-main/yolo_env/bin/python3.11
+#!/Applications/XAMPP/xamppfiles/htdocs/greyhound-admin-2025/yolo_env/bin/python3.10
 # -*- coding: utf-8 -*-
 import re
 import sys

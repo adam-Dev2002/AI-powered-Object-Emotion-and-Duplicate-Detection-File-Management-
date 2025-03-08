@@ -19,13 +19,6 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get the current page name
         </li><!-- End Recent Nav -->
 
         <li class="nav-item">
-            <a class="nav-link <?= $current_page == 'media_publishing.php' ? 'active' : 'collapsed' ?>" href="media_publishing.php">
-                <i class="bi bi-broadcast"></i> <!-- Media Publishing Icon -->
-                <span>Media Publishing</span>
-            </a>
-        </li><!-- End Media Publishing Nav -->
-
-        <li class="nav-item">
             <a class="nav-link <?= $current_page == 'index.php' ? 'active' : 'collapsed' ?>" href="index.php">
                 <i class="bi bi-grid"></i> <!-- Dashboard Icon -->
                 <span>Dashboard</span>

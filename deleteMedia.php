@@ -1,58 +1,65 @@
 <?php
-// Include database configuration
-require_once 'config.php';
+require_once 'config.php'; // Include database configuration
 
-// Get the raw POST data
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Check if the necessary parameters are present
-if (isset($data['filepath']) && isset($data['fileName'])) {
+if (isset($data['filepath'])) {
     $filePath = trim($data['filepath']);
-    $fileName = trim($data['fileName']);
 
-    // Log the file path for debugging
-    error_log("Delete request for file: $filePath");
+    // Log for debugging
+    error_log("Delete request for: $filePath");
 
-    // Check if the file exists in the filesystem
-    if (file_exists($filePath)) {
-        // Attempt to delete the file from the filesystem
-        if (unlink($filePath)) {
-            // File deleted successfully from the filesystem
-            
-            // Prepare SQL to delete the record from the `files` table
-            $stmt = $conn->prepare("DELETE FROM files WHERE filepath = ?");
-            $stmt->bind_param("s", $filePath);
-
-            if ($stmt->execute()) {
-                // Record successfully deleted from the database
-                echo json_encode(['status' => 'success', 'message' => 'File deleted successfully from filesystem and database.']);
-            } else {
-                // Failed to delete the record from the database
-                error_log("Failed to delete record from database: " . $conn->error);
-                echo json_encode(['status' => 'error', 'message' => 'File deleted from filesystem, but failed to delete record from database.']);
+    // Function to recursively delete directories
+    function deleteDirectory($dir) {
+        if (!file_exists($dir)) {
+            return true;
+        }
+        if (!is_dir($dir)) {
+            return unlink($dir);
+        }
+        foreach (scandir($dir) as $item) {
+            if ($item == '.' || $item == '..') continue;
+            if (!deleteDirectory($dir . DIRECTORY_SEPARATOR . $item)) {
+                return false;
             }
+        }
+        return rmdir($dir);
+    }
 
-            $stmt->close();
+    if (is_dir($filePath)) {
+        // It's a directory; attempt to delete recursively
+        $deleted = deleteDirectory($filePath);
+    } else if (file_exists($filePath)) {
+        // It's a file; attempt to delete
+        $deleted = unlink($filePath);
+    } else {
+        // File or directory does not exist
+        echo json_encode(['status' => 'error', 'message' => 'File or directory not found.']);
+        $conn->close();
+        exit;
+    }
+
+    if ($deleted) {
+        // Delete the record from the 'files' table
+        $stmtFiles = $conn->prepare("DELETE FROM files WHERE filepath = ?");
+        $stmtFiles->bind_param("s", $filePath);
+        $stmtFiles->execute();
+        $stmtFiles->close();
+
+        // Delete the record from the 'album_files' table
+        $stmtAlbumFiles = $conn->prepare("DELETE FROM album_files WHERE filepath = ?");
+        $stmtAlbumFiles->bind_param("s", $filePath);
+        $stmtAlbumFiles->execute();
+        $stmtAlbumFiles->close();
+
+        // Check if both deletions were successful
+        if ($stmtFiles->affected_rows > 0 || $stmtAlbumFiles->affected_rows > 0) {
+            echo json_encode(['status' => 'success', 'message' => 'Item deleted successfully from filesystem and databases.']);
         } else {
-            // If deletion fails from filesystem
-            error_log("Failed to delete file: $filePath");
-            echo json_encode(['status' => 'error', 'message' => 'Failed to delete the file from the filesystem.']);
+            echo json_encode(['status' => 'error', 'message' => 'Item deleted from filesystem, but no database records found.']);
         }
     } else {
-        // File does not exist in the filesystem
-        error_log("File does not exist: $filePath");
-
-        // Still attempt to delete the record in the database
-        $stmt = $conn->prepare("DELETE FROM files WHERE filepath = ?");
-        $stmt->bind_param("s", $filePath);
-
-        if ($stmt->execute()) {
-            echo json_encode(['status' => 'success', 'message' => 'File not found, but record deleted from database.']);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'File not found and failed to delete record from database.']);
-        }
-
-        $stmt->close();
+        echo json_encode(['status' => 'error', 'message' => 'Failed to delete the item from the filesystem.']);
     }
 } else {
     // If required parameters are missing
@@ -64,10 +71,4 @@ $conn->close();
 
 // Log raw POST data for debugging
 error_log("Raw POST data: " . file_get_contents('php://input'));
-
-// Decode JSON input
-$data = json_decode(file_get_contents('php://input'), true);
-
-// Log decoded data
-error_log("Decoded request: " . print_r($data, true));
 ?>

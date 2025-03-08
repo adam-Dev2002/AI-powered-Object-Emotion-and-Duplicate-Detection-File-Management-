@@ -41,8 +41,11 @@ require 'head.php';?>
 <main id="main" class="main">
     <div class="profile-card-container">
         <div class="card profile-card">
-            <!-- Header with profile picture and name -->
-            <div class="profile-header text-center">
+          <!-- Header with profile picture and name -->
+          <div class="profile-header text-center">
+                <img src="https://studentlogs.foundationu.com/Photo/<?php echo htmlspecialchars($user['employee_id']); ?>.JPG" 
+                     alt="Profile" class="rounded-circle profile-image" width="120" height="120"
+                     onerror="this.onerror=null; this.src='assets/img/default-profile.png';">
                 <h2><?php echo htmlspecialchars($user['name']); ?></h2>
                 <h4><?php echo htmlspecialchars($user['position']); ?></h4>
             </div>

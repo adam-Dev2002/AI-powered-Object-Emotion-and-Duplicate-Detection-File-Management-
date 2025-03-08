@@ -5,33 +5,30 @@ header('Content-Type: application/json');
 // Path to the lock file
 $lockFile = __DIR__ . '/scan_running.lock';
 
-// Check if the lock file exists
+// ✅ Check if the lock file exists
 if (file_exists($lockFile)) {
-    try {
-        // Find and kill the Python process using the lock file
-        $command = "ps aux | grep 'yolo_ai.py' | grep -v grep | awk '{print $2}'";
-        $processId = shell_exec($command);
+    $processId = trim(file_get_contents($lockFile)); // ✅ Read the stored PID
 
-        if ($processId) {
-            // Kill the Python process
-            shell_exec("kill -9 $processId");
-            unlink($lockFile); // Remove the lock file
+    if ($processId && is_numeric($processId)) {
+        // ✅ Kill the process
+        shell_exec("kill -9 $processId");
 
-            $_SESSION['scan_running'] = false;
-            echo json_encode(['status' => 'success', 'message' => 'Scan stopped successfully.']);
-            exit;
-        } else {
-            unlink($lockFile); // If no process found, remove the lock file
-            $_SESSION['scan_running'] = false;
-            echo json_encode(['status' => 'success', 'message' => 'Scan stopped successfully.']);
-            exit;
-        }
-    } catch (Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to stop scan: ' . $e->getMessage()]);
+        // ✅ Remove the lock file
+        unlink($lockFile);
+        $_SESSION['scan_running'] = false;
+
+        echo json_encode(['status' => 'success', 'message' => 'Sync stopped successfully.']);
+        exit;
+    } else {
+        // ✅ If no valid PID found, remove the lock file
+        unlink($lockFile);
+        $_SESSION['scan_running'] = false;
+
+        echo json_encode(['status' => 'error', 'message' => 'No valid process found.']);
         exit;
     }
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'No scan is currently running.']);
+    echo json_encode(['status' => 'error', 'message' => 'No sync is currently running.']);
     exit;
 }
 ?>

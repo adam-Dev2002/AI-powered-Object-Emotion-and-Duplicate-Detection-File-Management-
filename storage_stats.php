@@ -1,5 +1,5 @@
 <?php
-$base_directory = '/Volumes/creative/Hara All About/Photoshoots';
+$base_directory = '/Applications/XAMPP/xamppfiles/htdocs/testcreative';
 
 // Define file extensions for categories
 $file_types = [

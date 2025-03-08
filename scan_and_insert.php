@@ -4,7 +4,10 @@ require_once 'config.php';
 // Set the base directory to scan
 
 //$base_directory = '/Volumes/creative/Hara All About/HARA sa FU 2025/Photoshoot';
-$base_directory = '/Users/capstone2024-2025/Downloads/testscan';
+//$base_directory = '/Users/capstone2024-2025/Downloads/testscan';
+//$base_directory = '/Applications/XAMPP/xamppfiles/htdocs/testcreative/categorizesample';
+
+$base_directory = '/Applications/XAMPP/xamppfiles/htdocs/testcreative/ALBUMS';
 
 
 

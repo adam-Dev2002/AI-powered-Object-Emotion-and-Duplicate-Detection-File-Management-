@@ -1,6 +1,12 @@
 <?php 
 require 'head.php';
 require 'login-check.php';
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+$pageTitle = 'Dashboard';
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -16,16 +22,13 @@ require 'login-check.php';
  
 
   <main id="main" class="main">
-
     <div class="pagetitle">
-      <h1>Dashboard</h1>
-      <nav>
+        <h1><?php echo $pageTitle; ?></h1>
         <ol class="breadcrumb">
-          <li class="breadcrumb-item"><a href="index.php">Home</a></li>
-          <li class="breadcrumb-item active">Dashboard</li>
+            <li class="breadcrumb-item active"><?php echo $pageTitle; ?></li>
         </ol>
-      </nav>
-    </div><!-- End Page Title -->
+    </div>
+
 
     <section class="section dashboard">
       <div class="row">
@@ -344,8 +347,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Database connection parameters
     $servername = "localhost";
     $username = "root";
-    $password = "capstone2425";
-    $dbname = "greyhound_creative";
+    $password = "";
+    $dbname = "fm_system";
 
     // Create database connection
     $conn = new mysqli($servername, $username, $password, $dbname);

@@ -2,6 +2,9 @@
 require 'head.php';
 require "config.php";
 require 'login-check.php';
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 
 
@@ -12,20 +15,31 @@ set_time_limit(0);
 
 
 
-// Function to convert file path to URL
-    // Function to convert file path to URL
-    function convertFilePathToURL($filePath) {
-        $baseDirectory = '/Volumes/creative';
-        $baseURL = 'http://172.16.152.45:8000/creative';
-    
-        // Replace the base directory with the base URL
-        $relativePath = str_replace($baseDirectory, '', $filePath);
-    
-        // Encode special characters in the URL
-        $urlPath = str_replace(' ', '%20', $relativePath);
-    
-        return $baseURL . '/' . ltrim($urlPath, '/');
+// Function to dynamically convert file paths to accessible URLs
+function convertFilePathToURL($filePath) {
+    // Check if the file path is already a valid URL
+    if (filter_var($filePath, FILTER_VALIDATE_URL)) {
+        return $filePath;
     }
+
+    // Define base paths dynamically with your fixed IP
+    $basePaths = [
+        '/Applications/XAMPP/xamppfiles/htdocs/testcreative' => 'http://172.16.152.47/testcreative',
+        '/var/www/html/testcreative' => 'http://172.16.152.47/testcreative'
+    ];
+
+    foreach ($basePaths as $localPath => $baseURL) {
+        if (strpos($filePath, $localPath) === 0) {
+            $relativePath = substr($filePath, strlen($localPath));
+            $relativePath = ltrim($relativePath, '/'); // Remove leading slash
+            return $baseURL . '/' . str_replace(' ', '%20', $relativePath);
+        }
+    }
+
+    return str_replace(' ', '%20', $filePath);
+}
+
+
     
 
 
@@ -37,66 +51,71 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
+
+
+
+
 // Page title
-$pageTitle = 'iFound AI Search';
+$pageTitle = 'Detection';
 
-// Fetch AI search results
-$aiSearchResults = [];
-$searchTerm = $_POST['searchTerm'] ?? null;
+    // Fetch AI search results
+    $aiSearchResults = [];
+    $searchTerm = $_POST['searchTerm'] ?? null;
 
-try {
-    if ($searchTerm) {
-        $searchTerms = explode(' ', trim($searchTerm)); // Split search terms by spaces
-        $placeholders = [];
-        $queryParams = [];
+    try {
+        if ($searchTerm) {
+            $searchTerms = explode(' ', trim($searchTerm)); // Split search terms by spaces
+            $placeholders = [];
+            $queryParams = [];
 
-        foreach ($searchTerms as $index => $term) {
-            $placeholder = ":searchTerm$index";
+            foreach ($searchTerms as $index => $term) {
+                $placeholder = ":searchTerm$index";
 
-            // Convert human-readable months to numeric format
-            $termLower = strtolower($term);
-            $monthMap = [
-                'january' => '01', 'february' => '02', 'march' => '03', 'april' => '04', 'may' => '05', 'june' => '06',
-                'july' => '07', 'august' => '08', 'september' => '09', 'october' => '10', 'november' => '11', 'december' => '12'
-            ];
-            if (isset($monthMap[$termLower])) {
-                $term = $monthMap[$termLower]; // Replace month names with numbers
+                // Convert human-readable months to numeric format
+                $termLower = strtolower($term);
+                $monthMap = [
+                    'january' => '01', 'february' => '02', 'march' => '03', 'april' => '04', 'may' => '05', 'june' => '06',
+                    'july' => '07', 'august' => '08', 'september' => '09', 'october' => '10', 'november' => '11', 'december' => '12'
+                ];
+                if (isset($monthMap[$termLower])) {
+                    $term = $monthMap[$termLower]; // Replace month names with numbers
+                }
+
+                // Allow partial matches on all fields, including new ones
+                $placeholders[] = "
+                    filename LIKE $placeholder 
+                    OR filepath LIKE $placeholder
+                    OR filetype LIKE $placeholder 
+                    OR size LIKE $placeholder
+                    OR dateupload LIKE $placeholder
+                    OR detected_objects LIKE $placeholder
+                    OR classification LIKE $placeholder
+                    OR pose LIKE $placeholder
+                    OR gesture LIKE $placeholder
+                    OR face_gesture LIKE $placeholder
+                    OR emotion LIKE $placeholder
+                    OR content_hash LIKE $placeholder
+                    OR duplicate_group LIKE $placeholder
+                    OR duplicate_warning LIKE $placeholder
+                    OR datecreated LIKE $placeholder
+                ";
+                $queryParams[$placeholder] = "%$term%";
             }
 
-            // Allow partial matches on all fields, including new ones
-            $placeholders[] = "
-                filename LIKE $placeholder 
-                OR filepath LIKE $placeholder
-                OR filetype LIKE $placeholder 
-                OR size LIKE $placeholder
-                OR dateupload LIKE $placeholder
-                OR detected_objects LIKE $placeholder
-                OR classification LIKE $placeholder
-                OR pose LIKE $placeholder
-                OR gesture LIKE $placeholder
-                OR face_gesture LIKE $placeholder
-                OR emotion LIKE $placeholder
-                OR content_hash LIKE $placeholder
-                OR duplicate_group LIKE $placeholder
-                OR duplicate_warning LIKE $placeholder
-                OR datecreated LIKE $placeholder
-            ";
-            $queryParams[$placeholder] = "%$term%";
+            // Combine search placeholders into the query
+            $query = "SELECT * FROM files WHERE " . implode(' OR ', $placeholders) . " ORDER BY dateupload DESC";
+            $stmt = $pdo->prepare($query);
+            $stmt->execute($queryParams);
+        } else {
+            // Default query if no search term is provided
+            $stmt = $pdo->query("SELECT * FROM files ORDER BY dateupload DESC");
         }
 
-        // Combine search placeholders into the query
-        $query = "SELECT * FROM files WHERE " . implode(' OR ', $placeholders) . " ORDER BY dateupload DESC";
-        $stmt = $pdo->prepare($query);
-        $stmt->execute($queryParams);
-    } else {
-        // Default query if no search term is provided
-        $stmt = $pdo->query("SELECT * FROM files ORDER BY dateupload DESC");
+        $aiSearchResults = $stmt->fetchAll(PDO::FETCH_ASSOC); // Fetch results
+    } catch (PDOException $e) {
+        die("Error fetching AI search results: " . $e->getMessage());
     }
 
-    $aiSearchResults = $stmt->fetchAll(PDO::FETCH_ASSOC); // Fetch results
-} catch (PDOException $e) {
-    die("Error fetching AI search results: " . $e->getMessage());
-}
 
 
 // Fetch distinct file types from the database
@@ -113,41 +132,7 @@ try {
 }
 
 
-$duplicates = [];
-try {
-    $duplicatesQuery = $pdo->query("
-        SELECT 
-            f1.id AS file_id, 
-            f1.filename, 
-            f1.filepath, 
-            f1.filetype, 
-            f1.dateupload,
-            f1.filehash,
-            f1.content_hash,
-            COUNT(f2.id) AS duplicate_count
-        FROM files AS f1
-        INNER JOIN files AS f2 
-            ON (f1.filehash = f2.filehash OR f1.content_hash = f2.content_hash) 
-            AND f1.id != f2.id
-        GROUP BY 
-            f1.id, 
-            f1.filename, 
-            f1.filepath, 
-            f1.filetype, 
-            f1.dateupload, 
-            f1.filehash, 
-            f1.content_hash
-        HAVING duplicate_count > 0
-        ORDER BY f1.dateupload DESC
-    ");
-    
-    $duplicates = $duplicatesQuery->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Error fetching duplicates: " . $e->getMessage());
-    die("Error fetching duplicates: Please try again later.");
-}
 
-$duplicateCount = count($duplicates);
 
 ?>
 
@@ -216,6 +201,25 @@ $duplicateCount = count($duplicates);
         gap: 5px;
     }
 
+    /* Apply truncation to file names */
+.grid-item .file-info {
+    max-width: 150px;  /* Adjust width as needed */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Show full file name on hover */
+.grid-item .file-info:hover {
+    overflow: visible;
+    white-space: normal;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 5px;
+    border-radius: 4px;
+    position: absolute;
+    z-index: 10;
+}
+
     .grid-view .actions button {
         font-size: 12px;
     }
@@ -243,6 +247,28 @@ $duplicateCount = count($duplicates);
         align-items: center;
         z-index: 1050; /* Ensures the modal is above the header */
     }
+
+    .preview-container {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+}
+
+#preview-image {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+#bounding-boxes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Prevent interaction */
+}
+
     #file-preview-content {
         max-width: 80%;
         max-height: 80%;
@@ -275,6 +301,96 @@ $duplicateCount = count($duplicates);
     width: 100%;
     overflow-x: auto; /* Ensure scrollbars appear when needed */
 }
+
+/* 📌 Container for Table Selection */
+/* 📌 General Table Button Styles */
+/* 📌 General Table Button Styles */
+/* 📌 General Table Button Styles */
+.table-selector {
+    display: flex;
+    gap: 10px;
+}
+
+.table-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 12px 18px;
+    border: none;
+    font-weight: bold;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.1s, filter 0.3s;
+    font-size: 14px;
+}
+
+/* 📌 Ensuring Icons Stay Visible */
+.table-button i {
+    margin-right: 8px;
+    transition: color 0.3s ease;
+}
+
+/* 📌 Button Colors */
+#showDetectedObjects {
+    background-color: #007bff; /* Blue */
+}
+
+#showEmotions {
+    background-color: #28a745; /* Green */
+}
+
+#showDuplicates {
+    background-color: #dc3545; /* Red */
+}
+
+/* 📌 Hover Effects */
+.table-button:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+}
+
+/* 📌 Ensuring Active Button Retains Its Color & Icons */
+.table-button.active {
+    filter: brightness(1.2);
+}
+
+/* ✅ **Fix: Ensuring Icons Don't Disappear When Toggled** */
+.table-button.active i {
+    color: inherit !important;
+    visibility: visible !important;
+}
+
+
+
+   /* 🔹 Auto-Suggest Styles */
+   .position-relative {
+    position: relative;  /* Ensures that the child elements can be positioned absolutely relative to this container */
+}
+
+#suggestions {
+    position: absolute;
+    top: 100%;  /* Positions the top of the suggestions list right below the search bar */
+    left: 0;
+    width: 100%;  /* Makes the suggestions list as wide as the search bar */
+    background: white;
+    z-index: 1000;  /* Ensures it appears on top of other content but below the search bar */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);  /* Optional: Adds a slight shadow for better visibility */
+    max-height: 300px;  /* Limits the height of the suggestions box */
+    overflow-y: auto;  /* Adds a scrollbar if the content is taller than max-height */
+}
+
+#suggestions div {
+    padding: 8px 16px;  /* Adds padding inside each suggestion for better readability */
+    cursor: pointer;  /* Changes the mouse cursor to indicate clickable items */
+}
+
+#suggestions div:hover {
+    background-color: #f0f0f0;  /* Changes background on hover for visual feedback */
+}
+
+
+
+
     
     </style>
 </head>
@@ -288,22 +404,39 @@ $duplicateCount = count($duplicates);
     </div>
 
     <section class="section">
-        <div class="row">
-            <div class="col-lg-12">
-                <!-- AI Search Form -->
-                <form method="POST" action="">
-                    <div class="input-group mb-3">
-                        <input type="text" name="searchTerm" class="form-control" placeholder="Search..." value="<?php echo htmlspecialchars($searchTerm ?? ''); ?>">
-                        <button class="btn btn-primary" type="submit">Search</button>
-                    </div>
-                </form>
+    <div class="row">
+        <div class="col-lg-12">
+            <!-- ✅ AI Search Form with Auto-Suggest -->
+            <form method="POST" action="">
+            <div class="input-group mb-3 position-relative">
+    <input type="text" id="search-bar" name="searchTerm" class="form-control" placeholder="Search..."
+           value="<?php echo htmlspecialchars($searchTerm ?? ''); ?>" autocomplete="off">
+    <button class="btn btn-primary" type="submit">Search</button>
+    <div id="suggestions" class="suggestions" style="display:none; position: absolute; width: 100%; background: white; z-index: 1000;"></div>
+</div>
+
+            </form>
 
 
-                <div>
-    <button id="startScan" class="btn btn-success">Start Scan</button>
-    <button id="stopScan" class="btn btn-danger" disabled>Stop Scan</button>
-    <span id="progress">Progress: 0%</span>
-    <div class="progress mt-2 mb-3"> <!-- Added mb-3 for margin below -->
+
+            <div class="table-selector">
+    <button id="showDetectedObjects" class="table-button detected-objects">
+        <i class="fas fa-search"></i> Detected Objects
+    </button>
+    <button id="showEmotions" class="table-button emotions">
+        <i class="fas fa-smile"></i> Emotions
+    </button>
+    <button id="showDuplicates" class="table-button duplicates">
+        <i class="fas fa-clone"></i> Duplicates
+    </button>
+</div>
+
+
+<!-- Sync Files Button -->
+<button id="syncFiles" class="btn btn-primary" style="display: none;">Sync Files</button>
+
+<span id="progress">Progress: 0%</span>
+<div class="progress mt-2 mb-3">
     <div id="progressBar" class="progress-bar" role="progressbar" 
          style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
 </div>
@@ -318,6 +451,8 @@ $duplicateCount = count($duplicates);
             <input class="form-check-input" type="radio" name="filter-filetype" id="filterAll" value="all" checked>
             <label class="form-check-label" for="filterAll">All</label>
         </div>
+
+        
         <?php foreach ($fileTypes as $type): ?>
         <div class="form-check form-check-inline">
             <input class="form-check-input" type="radio" name="filter-filetype" id="filter-<?php echo htmlspecialchars($type); ?>" value="<?php echo htmlspecialchars($type); ?>">
@@ -335,21 +470,123 @@ $duplicateCount = count($duplicates);
             <button id="list-view-btn" class="btn btn-outline-primary"><i class="fas fa-list"></i></button>
             <button id="grid-view-btn" class="btn btn-outline-secondary"><i class="fas fa-th-large"></i></button>
         </div>
-        <button id="toggle-duplicates" class="btn btn-secondary">
-        Show Duplicates (<?php echo $duplicateCount; ?>)
-        </button>
+       
+    </div>
+</div>
+
+<!-- Bulk Action Buttons -->
+<div class="action-button-container d-flex gap-2 mb-3 d-none">
+    <!-- Bulk Delete -->
+    <button type="button" class="btn btn-danger d-flex align-items-center" id="deleteSelectedBtn">
+        <i class="fas fa-trash-alt me-2"></i> Delete Selected
+    </button>
+
+    <!-- Move to Trash -->
+    <button type="button" class="btn btn-warning d-flex align-items-center" id="moveToTrashBtn">
+        <i class="fas fa-trash me-2"></i> Move to Trash
+    </button>
+
+    <!-- Bulk Download (NEW) -->
+    <button type="button" class="btn btn-primary d-flex align-items-center" id="downloadSelectedBtn">
+        <i class="fas fa-download me-2"></i> Download Selected
+    </button>
+</div>
+
+
+
+
+
+<!-- ✅ Scan Completion Modal -->
+<div id="scanCompleteModal" class="modal fade" tabindex="-1" aria-labelledby="scanCompleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scanCompleteModalLabel">
+                    <i class="fas fa-check-circle text-success"></i> Scan Completed
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>The scan has been completed successfully.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
     </div>
 </div>
 
 
-<!-- Action Buttons -->
-<div class="action-button-container" style="display: none;">
-    <!-- Delete Selected -->
-    <button type="button" class="btn btn-danger" id="deleteSelectedBtn">Delete Selected</button>
-    
-    <!-- Move to Trash -->
-    <button type="button" class="btn btn-warning" id="moveToTrashBtn">Move to Trash</button>
+<!-- ✅ Confirmation Modal -->
+<div class="modal fade" id="confirmationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmationModalLabel">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmationModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmActionBtn">Proceed</button>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- ✅ Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Success</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="successModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Error</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="errorModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ Sync Started Modal -->
+<div id="syncStartedModal" class="modal fade" tabindex="-1" aria-labelledby="syncStartedModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="syncStartedModalLabel">
+                    <i class="fas fa-sync-alt text-primary"></i> Sync Started
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>The file synchronization process has started. Please wait...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 
 <div id="list-view" class="table-responsive">
     <table id="fileTable" class="table table-hover table-striped">
@@ -371,49 +608,76 @@ $duplicateCount = count($duplicates);
                     <input type="checkbox" class="row-checkbox" value="<?php echo htmlspecialchars($file['filepath']); ?>">
                 </td>
                 <td class="thumbnail">
-                    <img src="<?php echo convertFilePathToURL($file['filepath']); ?>" alt="Thumbnail" 
-                         onclick="openPreview('<?php echo convertFilePathToURL($file['filepath']); ?>', '<?php echo $file['filetype']; ?>')">
-                </td>
+    <?php
+    $fileURL = convertFilePathToURL($file['filepath']); // Convert local path to HTTP URL
+    $fileType = htmlspecialchars($file['filetype']);
+
+    if (preg_match('/(jpg|jpeg|png|gif)$/i', $fileType)) {
+        // ✅ Image Preview
+        echo "<img src='" . htmlspecialchars($fileURL) . "' 
+                     alt='Thumbnail' 
+                     class='thumbnail' 
+                     style='width: 60px; height: 60px; object-fit: cover; cursor: pointer;'
+                     onclick=\"openPreview('" . htmlspecialchars($fileURL) . "', '$fileType')\">";
+    } elseif (preg_match('/(mp4|mov|avi)$/i', $fileType)) {
+        // ✅ Video with Play Button
+        echo "<div class='video-thumbnail' style='position: relative; width: 60px; height: 60px; cursor: pointer;'
+                onclick=\"openPreview('$fileURL', '$fileType')\">
+                <video src='" . htmlspecialchars($fileURL) . "' 
+                       class='thumbnail' 
+                       muted 
+                       style='width: 100%; height: 100%; object-fit: cover;'>
+                </video>
+                <div class='play-button' 
+                     style='position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                            width: 20px; height: 20px; background: rgba(0, 0, 0, 0.5); 
+                            border-radius: 50%; display: flex; justify-content: center; align-items: center;'>
+                    <i class='fas fa-play' style='color: white; font-size: 12px;'></i>
+                </div>
+              </div>";
+    } else {
+        // ✅ No Preview Available
+        echo "<span>No Preview</span>";
+    }
+    ?>
+</td>
+
+
                 <td><?php echo htmlspecialchars($file['filename']); ?></td>
                 <td><?php echo htmlspecialchars($file['filetype']); ?></td>
                 <td class="shortened-path"><?php echo htmlspecialchars($file['filepath']); ?></td>
                 <td>
-    <?php echo htmlspecialchars($file['datecreated'] ?? 'N/A'); ?>
-</td>
-
+                    <?php echo htmlspecialchars($file['datecreated'] ?? 'N/A'); ?>
+                </td>
                 <td>
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($file['filename']); ?>" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-cogs"></i> Actions
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($file['filename']); ?>">
-                            <li>
-                                <a class="dropdown-item" href="javascript:void(0);" onclick="publishMedia('<?php echo addslashes(htmlspecialchars($file['filepath'])); ?>')">
-                                    <i class="fas fa-cloud-upload-alt"></i> Publish
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo addslashes(htmlspecialchars($file['filepath'])); ?>', '<?php echo addslashes(htmlspecialchars($file['filename'])); ?>')">
-                                    <i class="fas fa-i-cursor"></i> Rename
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo addslashes(htmlspecialchars($file['filepath'])); ?>')">
-                                    <i class="fas fa-copy"></i> Copy
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo addslashes(htmlspecialchars($file['filepath'])); ?>')">
-                                    <i class="fas fa-download"></i> Download
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="moveToTrash('<?php echo addslashes(htmlspecialchars($file['filepath'], ENT_QUOTES, 'UTF-8')); ?>', '<?php echo addslashes(htmlspecialchars($file['filename'], ENT_QUOTES, 'UTF-8')); ?>')">
-                                    <i class="fas fa-trash"></i> Move to Trash
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
+                <div class="dropdown">
+    <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($file['filename']); ?>" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="fas fa-cogs"></i> Actions
+    </button>
+    <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($file['filename']); ?>">
+        <li>
+            <a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo addslashes($file['filepath']); ?>', '<?php echo addslashes($file['filename']); ?>')">
+                <i class="fas fa-i-cursor"></i> Rename
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo addslashes($file['filepath']); ?>')">
+                <i class="fas fa-copy"></i> Copy
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo addslashes($file['filepath']); ?>')">
+                <i class="fas fa-download"></i> Download
+            </a>
+        </li>
+        <li>
+            <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="moveToTrash('<?php echo addslashes($file['filepath']); ?>', '<?php echo addslashes($file['filename']); ?>')">
+                <i class="fas fa-trash"></i> Move to Trash
+            </a>
+        </li>
+    </ul>
+</div>
+
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -424,12 +688,30 @@ $duplicateCount = count($duplicates);
 
 
 
-
 <div id="grid-view" class="grid-view d-none">
     <?php foreach ($aiSearchResults as $file): ?>
     <div class="grid-item" data-type="<?php echo htmlspecialchars($file['filetype']); ?>">
-        <img src="<?php echo convertFilePathToURL($file['filepath']); ?>" alt="Thumbnail"
-             onclick="openPreview('<?php echo convertFilePathToURL($file['filepath']); ?>', '<?php echo $file['filetype']; ?>')">
+        <?php
+        $fileURL = convertFilePathToURL($file['filepath']); // Ensure conversion
+        $fileType = htmlspecialchars($file['filetype']);
+
+        if (preg_match('/\.(jpg|jpeg|png|gif)$/i', $file['filepath'])) {
+            echo "<img src='" . htmlspecialchars($fileURL) . "' 
+                     alt='Thumbnail' 
+                     class='thumbnail'
+                     style='cursor: pointer; width: 100%; height: auto; object-fit: cover;'
+                     onclick=\"openPreview('" . htmlspecialchars($fileURL) . "', '$fileType')\">";
+        } elseif (preg_match('/\.(mp4|mov|avi)$/i', $file['filepath'])) {
+            echo "<div class='video-thumbnail' style='position: relative; cursor: pointer;' onclick=\"openPreview('$fileURL', '$fileType')\">
+                    <video src='" . htmlspecialchars($fileURL) . "' muted style='width: 100%; object-fit: cover;'></video>
+                    <div class='play-button' style='position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(0, 0, 0, 0.5); border-radius: 50%; display: flex; justify-content: center; align-items: center;'>
+                        <i class='fas fa-play' style='color: white; font-size: 20px;'></i>
+                    </div>
+                  </div>";
+        } else {
+            echo "<span>No Preview</span>";
+        }
+        ?>
         <div class="file-info">
             <div><?php echo htmlspecialchars($file['filename']); ?></div>
             <div><?php echo htmlspecialchars($file['filetype']); ?></div>
@@ -437,6 +719,8 @@ $duplicateCount = count($duplicates);
     </div>
     <?php endforeach; ?>
 </div>
+
+
 
 <!-- File Preview Section -->
 <div id="file-preview-overlay" style="display: none;">
@@ -447,232 +731,329 @@ $duplicateCount = count($duplicates);
 </div>
 
 
- <!-- SCRIPT FOR BULK DELETE-->
- <script>
-document.addEventListener("DOMContentLoaded", function() {
-    // Get references to the elements
-    const actionButtonContainer = document.querySelector('.action-button-container');
-    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
-    const deleteSelectedBtn = document.querySelector('#deleteSelectedBtn');
-    const selectAllCheckbox = document.querySelector('#select-all');
 
-    // Function to toggle the visibility of the action button
-    function toggleActionButton() {
-        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
-        if (isAnyCheckboxSelected) {
-            actionButtonContainer.style.display = 'block';
-            deleteSelectedBtn.textContent = 'Delete Selected'; // Set button text to "Delete Selected"
-        } else {
-            actionButtonContainer.style.display = 'none';
-        }
-    }
 
-    // Add event listeners to all checkboxes
-    rowCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', toggleActionButton);
-    });
+<script>
+$(document).ready(function () {
+    checkFileStatus(); // ✅ Run only once on page load
 
-    // Handle "Select All" checkbox
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            rowCheckboxes.forEach(checkbox => checkbox.checked = selectAllCheckbox.checked);
-            toggleActionButton();
+    function checkFileStatus() {
+        $.ajax({
+            url: "check_files.php",
+            type: "GET",
+            dataType: "json",
+            success: function (response) {
+                if (response.files_exist) {
+                    // ✅ Show all buttons if any file exists
+                    $("#showDetectedObjects").show();
+                    $("#showEmotions").show();
+                    $("#showDuplicates").show();
+                } else {
+                    // ✅ Hide all buttons if no files exist
+                    $("#showDetectedObjects").hide();
+                    $("#showEmotions").hide();
+                    $("#showDuplicates").hide();
+                }
+            },
+            error: function () {
+                console.error("Error fetching file status.");
+            }
         });
-    }
-
-    // Run once to ensure the button's initial state is correct
-    toggleActionButton();
-
-    // Bulk deletion logic with alert and confirmation
-    deleteSelectedBtn.addEventListener('click', async function() {
-        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
-
-        if (selectedCheckboxes.length === 0) {
-            alert('No files or folders selected for deletion.');
-            return;
-        }
-
-        // Collect the names of all selected files/folders
-        const selectedItems = selectedCheckboxes.map(checkbox => {
-            const row = checkbox.closest('tr');
-            const fileNameElement = row.querySelector('.file-folder-link');
-            const fileName = fileNameElement ? fileNameElement.textContent.trim() : 'Unknown'; // Handle missing file-folder-link gracefully
-            return fileName;
-        });
-
-        // Alert the list of selected items once
-        alert(`The following files/folders are selected for deletion:\n\n${selectedItems.join('\n')}`);
-
-        // Create a confirmation message
-        const confirmationMessage = `Are you sure you want to delete these files/folders?`;
-
-        if (!confirm(confirmationMessage)) {
-            return; // Exit if the user cancels
-        }
-
-        // If confirmed, send delete requests for all selected items
-        const deletionPromises = selectedCheckboxes.map(checkbox => {
-            const row = checkbox.closest('tr');
-            const filePath = row.getAttribute('data-path'); // Get the file path
-            const fileName = row.querySelector('.file-folder-link') ? row.querySelector('.file-folder-link').textContent.trim() : 'Unknown'; // Get the file or folder name
-
-            // Make an async request to delete the file/folder
-            return deleteMedia(filePath, fileName);
-        });
-
-        try {
-            // Wait for all deletions to complete
-            const results = await Promise.all(deletionPromises);
-
-            // Filter success and failure messages
-            const successCount = results.filter(result => result.status === 'success').length;
-            const errorCount = results.length - successCount;
-
-            // Alert success message once
-            alert(`Deletion complete. ${successCount} item(s) deleted successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to delete.` : ''}`);
-
-            // Optionally reload the page or update the UI
-            location.reload();
-        } catch (error) {
-            console.error('Error during deletion:', error);
-            alert('An unexpected error occurred during deletion.');
-        }
-    });
-
-    // Function to handle the deletion request
-    async function deleteMedia(filePath, fileName) {
-        try {
-            const response = await fetch('deleteMedia.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ filepath: filePath, fileName: fileName }),
-            });
-
-            return await response.json(); // Parse the JSON response
-        } catch (error) {
-            console.error(`Error deleting file ${fileName}:`, error);
-            return { status: 'error', message: 'Network error during deletion.' };
-        }
     }
 });
+
 
 </script>
 
+
+
 <script>
-   $(document).ready(function () {
-    let currentFiles = []; // Array to store the list of files (url, type)
-    let currentIndex = 0;  // Index to track the currently previewed file
+$(document).ready(function () {
+    $(".table-button").on("click", function () {
+        const isActive = $(this).hasClass("active");
 
-    // Function to close the preview modal
-    function closePreview() {
-        $('#file-preview-overlay').hide();
-    }
+        $(".table-button").removeClass("active"); // Remove active class from all
 
-    // Function to navigate to the previous or next file in the list
-    function navigateFile(direction) {
-        if (direction === 'next' && currentIndex < currentFiles.length - 1) {
-            currentIndex++;
-        } else if (direction === 'prev' && currentIndex > 0) {
-            currentIndex--;
+        if (!isActive) {
+            $(this).addClass("active"); // Add active class only if not already active
         } else {
-            console.log("Navigation limit reached");
-            return; // Prevent further execution if at the limits
+            $(this).removeClass("active"); // Allow toggling off
         }
-
-        const currentFile = currentFiles[currentIndex];
-        if (currentFile) {
-            console.log("Navigating to:", currentFile); // Log the file being navigated to
-            openModal(currentFile.url, currentFile.type);
-        } else {
-            console.error("No file found for current index:", currentIndex);
-        }
-    }
-
-    // Function to open the modal and preview the file
-    function openModal(fileUrl, fileType) {
-        const $content = $('#file-preview-content');
-        $content.empty(); // Clear previous content
-
-        // Handle different file types
-        if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
-            const img = $('<img>').attr('src', fileUrl).addClass('preview-media').css({
-                width: '100%',
-                maxHeight: '80vh',
-                objectFit: 'contain'
-            });
-            $content.append(img);
-        } else if (fileType.match(/(mp4|avi|mov|mkv)$/i)) {
-            const video = $('<video>').attr({
-                src: fileUrl,
-                controls: true
-            }).addClass('preview-media').css({
-                width: '100%',
-                maxHeight: '80vh'
-            });
-            $content.append(video);
-        } else {
-            const message = $('<p>').text("Preview not available for this file type.");
-            $content.append(message);
-        }
-
-        $('#file-preview-overlay').css('display', 'flex'); // Show the overlay
-    }
-
-    // Function to initialize and load files for navigation
-    function initializeFilePreview(files, startIndex = 0) {
-        if (!Array.isArray(files) || files.length === 0) {
-            console.error("No files available for preview");
-            return;
-        }
-
-        currentFiles = files; // Set the global files array
-        currentIndex = startIndex; // Set the starting index
-        const startFile = currentFiles[currentIndex];
-
-        if (startFile) {
-            openModal(startFile.url, startFile.type); // Open the first file in the list
-        }
-    }
-
-    // Event listeners for the next and previous buttons
-    $('#prev-btn').on('click', function () {
-        navigateFile('prev');
-    });
-
-    $('#next-btn').on('click', function () {
-        navigateFile('next');
-    });
-
-    // Event listener for the close button
-    $('#close-preview-btn').on('click', function () {
-        closePreview();
-    });
-
-    // Export the initializeFilePreview function for external use
-    window.initializeFilePreview = initializeFilePreview;
-
-    // Example usage: Dynamically load files when a preview is initiated
-    $('.thumbnail img').on('click', function () {
-        const allThumbnails = $('.thumbnail img'); // Select all thumbnail images
-        const files = [];
-
-        allThumbnails.each(function (index) {
-            const fileUrl = $(this).attr('src');
-            const fileType = fileUrl.split('.').pop(); // Get the file extension
-            files.push({ url: fileUrl, type: fileType });
-
-            // Check if the current thumbnail is the clicked one
-            if (this === event.target) {
-                currentIndex = index;
-            }
-        });
-
-        initializeFilePreview(files, currentIndex); // Initialize preview
     });
 });
 
+
+</script>
+ 
+</script>
+<!-- SCRIPT FOR BULK DELETE, MOVE TO TRASH, & DOWNLOAD -->
+<script>
+$(document).ready(function () {
+    const actionButtonContainer = $('.action-button-container'); // Bulk action buttons container
+    const deleteSelectedBtn = $('#deleteSelectedBtn'); // Bulk Delete
+    const moveToTrashBtn = $('#moveToTrashBtn'); // Bulk Move to Trash
+    const downloadSelectedBtn = $('#downloadSelectedBtn'); // Bulk Download
+    const selectAllCheckbox = $('#select-all'); // Select All Checkbox
+    let selectedFiles = [];
+    let actionType = '';
+
+    // ✅ Function to toggle bulk action buttons
+    function toggleBulkActionButtons() {
+        const checkedCount = $('.row-checkbox:checked').length;
+        if (checkedCount > 0) {
+            actionButtonContainer.removeClass('d-none').fadeIn();
+        } else {
+            actionButtonContainer.fadeOut(function () {
+                $(this).addClass('d-none');
+            });
+        }
+    }
+
+    // ✅ Attach event listener to all checkboxes (including dynamically added ones)
+    $(document).on('change', '.row-checkbox', function () {
+        toggleBulkActionButtons();
+    });
+
+    // ✅ Select All Checkbox Functionality
+    selectAllCheckbox.on('change', function () {
+        $('.row-checkbox').prop('checked', this.checked);
+        toggleBulkActionButtons();
+    });
+
+    // ✅ Open Confirmation Modal Before Performing an Action
+    function openConfirmationModal(action) {
+        selectedFiles = getSelectedFiles();
+        actionType = action;
+
+        if (selectedFiles.length === 0) {
+            showErrorModal("No files selected.");
+            return;
+        }
+
+        let modalTitle = "";
+        let modalMessage = "";
+
+        if (action === "delete") {
+            modalTitle = "Confirm Permanent Deletion";
+            modalMessage = `Are you sure you want to permanently delete these files? <br><br>
+                            <strong>${selectedFiles.map(f => f.filename).join("<br>")}</strong>`;
+        } else if (action === "move_to_trash") {
+            modalTitle = "Confirm Move to Trash";
+            modalMessage = `Are you sure you want to move these files to trash? <br><br>
+                            <strong>${selectedFiles.map(f => f.filename).join("<br>")}</strong>`;
+        } else if (action === "download") {
+            modalTitle = "Confirm Download";
+            modalMessage = `You are about to download these files: <br><br>
+                            <strong>${selectedFiles.map(f => f.filename).join("<br>")}</strong>`;
+        }
+
+        $("#confirmationModalLabel").html(modalTitle);
+        $("#confirmationModalBody").html(modalMessage);
+        $("#confirmationModal").modal("show");
+    }
+
+    // ✅ Execute Action After Confirmation
+    $("#confirmActionBtn").on("click", async function () {
+        $("#confirmationModal").modal("hide");
+        await performBulkAction(actionType);
+    });
+
+    // ✅ Bulk Delete Functionality
+    deleteSelectedBtn.on('click', function () {
+        openConfirmationModal("delete");
+    });
+
+    // ✅ Bulk Move to Trash
+    moveToTrashBtn.on('click', function () {
+        openConfirmationModal("move_to_trash");
+    });
+
+    // ✅ Bulk Download
+    downloadSelectedBtn.on('click', function () {
+        openConfirmationModal("download");
+    });
+
+    // ✅ Perform Bulk Action via AJAX
+   // ✅ Perform Bulk Action (Delete, Move to Trash, Download)
+async function performBulkAction(action) {
+    try {
+        const response = await fetch('bulkActionsHandler.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action, selectedFiles })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            if (action === "download") {
+                if (result.downloadUrl) {
+                    window.location.href = result.downloadUrl;
+
+                    // ✅ Fix: Show correct filenames instead of "undefined"
+                    const fileNames = selectedFiles.map(f => f.filename).join("<br>");
+                    showSuccessModal(`${selectedFiles.length} file(s) downloaded successfully.<br><br><strong>${fileNames}</strong>`);
+                } else {
+                    showErrorModal("Error: No download URL returned.");
+                }
+            } else {
+                // ✅ Fix: Ensure correct file count in messages
+                const fileNames = selectedFiles.map(f => f.filename).join("<br>");
+                showSuccessModal(`${result.successCount} file(s) ${action.replace("_", " ")} successfully.<br><br><strong>${fileNames}</strong>`);
+
+                // ✅ Remove deleted/moved files from UI dynamically
+                selectedFiles.forEach(file => {
+                    $(`tr[data-path="${file.filepath}"]`).remove();
+                });
+
+                toggleBulkActionButtons();
+            }
+        } else {
+            showErrorModal(`Error: ${result.message}`);
+        }
+    } catch (error) {
+        console.error(`Error during ${action}:`, error);
+        showErrorModal("An unexpected error occurred.");
+    }
+}
+
+
+    // ✅ Function to get selected files
+    function getSelectedFiles() {
+        return $('.row-checkbox:checked').map(function () {
+            const row = $(this).closest('tr');
+            const filePath = row.attr('data-path');
+            const fileNameElement = row.find('.file-folder-link');
+            const fileName = fileNameElement.length ? fileNameElement.text().trim() : filePath.split('/').pop();
+            return { filepath: filePath, filename: fileName };
+        }).get();
+    }
+
+    // ✅ Show Success Modal
+    function showSuccessModal(message) {
+        $("#successModalBody").html(message);
+        $("#successModal").modal("show");
+    }
+
+    // ✅ Show Error Modal
+    function showErrorModal(message) {
+        $("#errorModalBody").html(message);
+        $("#errorModal").modal("show");
+    }
+});
+
+
+</script>
+
+
+
+
+
+<script>
+  $(document).ready(function () {
+    let currentFiles = []; // Store the list of files (url, type)
+    let currentIndex = 0;  // Track the currently previewed file
+
+    // ✅ Function to initialize the file preview with navigation
+    function initializeFilePreview(files, startIndex) {
+        if (!files.length) {
+            console.error("No files available for preview.");
+            return;
+        }
+
+        currentFiles = files;
+        currentIndex = startIndex;
+
+        openModal(currentFiles[currentIndex].url, currentFiles[currentIndex].type);
+    }
+
+    // ✅ Function to open the modal and preview the file
+    function openModal(fileUrl, fileType) {
+        const overlay = $("#file-preview-overlay");
+        const content = $("#file-preview-content");
+        content.html(""); // Clear previous content
+
+        if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
+            content.append(`<img src="${fileUrl}" class="preview-media" style="width: 100%; max-height: 80vh; object-fit: contain;">`);
+        } else if (fileType.match(/(mp4|mov|avi)$/i)) {
+            content.append(`<video src="${fileUrl}" controls class="preview-media" style="width: 100%; max-height: 80vh;"></video>`);
+        } else {
+            content.append(`<p>Preview not available for this file type.</p>`);
+        }
+
+        overlay.fadeIn();
+    }
+
+    // ✅ Function to navigate files
+    function navigateFile(direction) {
+        if (direction === "next" && currentIndex < currentFiles.length - 1) {
+            currentIndex++;
+        } else if (direction === "prev" && currentIndex > 0) {
+            currentIndex--;
+        } else {
+            console.log("Reached the limit.");
+            return;
+        }
+
+        openModal(currentFiles[currentIndex].url, currentFiles[currentIndex].type);
+    }
+
+    // ✅ Collect files from both List View & Grid View
+    function collectFiles() {
+        currentFiles = []; // Reset array to prevent duplicates
+
+        // ✅ Collect files from Grid View
+        $(".grid-item .thumbnail").each(function (index) {
+            const fileUrl = $(this).attr("src");
+            const fileType = $(this).closest(".grid-item").attr("data-type");
+
+            if (fileUrl && fileType) {
+                currentFiles.push({ url: fileUrl, type: fileType });
+
+                $(this).off("click").on("click", function () {
+                    initializeFilePreview(currentFiles, index);
+                });
+            }
+        });
+
+        // ✅ Collect files from List View (Table View)
+        $("#fileTable .thumbnail").each(function (index) {
+            const fileUrl = $(this).attr("src");
+            const fileType = $(this).closest("tr").find("td:nth-child(4)").text().trim(); // Get file type from table
+
+            if (fileUrl && fileType) {
+                currentFiles.push({ url: fileUrl, type: fileType });
+
+                $(this).off("click").on("click", function () {
+                    initializeFilePreview(currentFiles, index);
+                });
+            }
+        });
+
+        console.log("Files collected:", currentFiles); // Debugging log
+    }
+
+    // ✅ Event Listeners
+    $("#prev-btn").on("click", function () {
+        navigateFile("prev");
+    });
+
+    $("#next-btn").on("click", function () {
+        navigateFile("next");
+    });
+
+    $("#close-preview-btn").on("click", function () {
+        $("#file-preview-overlay").fadeOut();
+    });
+
+    // ✅ Ensure files are collected when switching views
+    $("#list-view-btn, #grid-view-btn").click(function () {
+        collectFiles();
+    });
+
+    // ✅ Collect files initially
+    collectFiles();
+});
 
     </script>
 
@@ -682,7 +1063,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 <div id="file-preview-overlay" style="display: none;">
     <div id="file-preview-content"></div>
-    <span id="file-preview-close" onclick="closePreview()">×</span>
+    <span id="file-preview-close">×</span>
 </div>
 
 
@@ -691,66 +1072,72 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
 <script>
-let progressInterval;  // Interval for polling scan progress
-let fetchInterval;     // Interval for fetching scan results
+$(document).ready(function () {
+    checkFilesTable(); // ✅ Ensure sync button visibility is checked on page load
+    restoreProgressBarState(); // ✅ Ensure progress bar state is correct on page load
 
-// Start Scan Function
-function startScan() {
-    $("#startScan").hide();      // Hide Start Scan button
-    $("#stopScan").prop("disabled", false).show(); // Enable and show Stop Scan button
+    $("#syncFiles").on("click", function () {
+        startSync();
+    });
+});
 
+// ✅ Function to check if files exist using check_files.php
+function checkFilesTable() {
     $.ajax({
-        url: 'start_scan.php',
-        type: 'POST',
+        url: "check_files.php",
+        type: "GET",
+        dataType: "json",
         success: function (response) {
-            if (response.status === 'success') {
-                alert("Scan started successfully.");
-                pollProgress();       // Start polling scan progress
-                fetchLiveResults();   // Start fetching scan results
+            if (response.files_exist) {
+                $("#syncFiles").hide(); // ✅ Hide Sync button if files exist
             } else {
-                alert(response.message || "Failed to start scan.");
-                resetButtons();
+                $("#syncFiles").show(); // ✅ Show Sync button if no files exist
             }
         },
         error: function () {
-            alert("Failed to start scan. Please try again.");
-            resetButtons();
+            console.error("Error checking files table.");
         }
     });
 }
 
+// ✅ Start Sync Function (Triggers pollProgress)
+// ✅ Function to Start Sync with Modal
+function startSync() {
+    console.log("Sync Files button clicked");
 
-// Stop Scan Function
-function stopScan() {
-    $("#stopScan").prop("disabled", true); // Temporarily disable Stop button
+    $("#syncFiles").hide(); // ✅ Hide Sync button permanently
+    $("#progress, #progressBar, .progress").show(); // ✅ Show progress bar
+    sessionStorage.setItem("progressVisible", "true"); // ✅ Store progress bar state
 
     $.ajax({
-        url: 'stop_scan.php',
+        url: 'sync_files.php',
         type: 'POST',
         dataType: 'json',
         success: function (response) {
             if (response.status === 'success') {
-                alert("Scan stopped successfully.");
-                clearInterval(progressInterval); // Stop progress polling
-                clearInterval(fetchInterval);    // Stop fetching results
-                
-                resetProgressBar();              // Reset the progress bar
-                resetButtons();                  // Reset buttons (enable Start, disable Stop)
+                // ✅ Show Sync Started Modal instead of alert
+                $("#syncStartedModal").modal("show");
+
+                // ✅ Start polling progress after closing modal
+                $("#syncStartedModal").off("hidden.bs.modal").on("hidden.bs.modal", function () {
+                    pollProgress();
+                });
+
             } else {
-                alert(response.message);
-                $("#stopScan").prop("disabled", false); // Re-enable Stop button if stop fails
+                showErrorModal(response.message || "Failed to start sync.");
             }
         },
         error: function () {
-            alert("Failed to stop scan. Please try again.");
-            $("#stopScan").prop("disabled", false); // Re-enable Stop button on error
+            showErrorModal("Failed to sync files. Please try again.");
         }
     });
 }
 
-// Poll Scan Progress
+
+// ✅ Poll Scan Progress (Uses scan_progress.php)
+
 function pollProgress() {
-    progressInterval = setInterval(function () {
+    let progressInterval = setInterval(function () {
         $.ajax({
             url: 'scan_progress.php',
             type: 'GET',
@@ -759,111 +1146,128 @@ function pollProgress() {
                 if (data.status === 'running') {
                     const progress = parseFloat(data.progress).toFixed(2);
                     updateProgressBar(progress);
-
-                    if (progress >= 100) {
-                        clearInterval(progressInterval);
-                        clearInterval(fetchInterval);
-                        updateProgressBar(100);
-                        alert("Scan completed successfully!");
-                        resetButtons();
-                    }
-                } else if (data.status === 'completed') {
+                } else if (data.status === 'completed' || parseFloat(data.progress) >= 100) {
                     clearInterval(progressInterval);
-                    clearInterval(fetchInterval);
                     updateProgressBar(100);
-                    alert("Scan completed successfully!");
-                    resetButtons();
+
+                    // ✅ Show the scan completion modal instead of alert
+                    $("#scanCompleteModal").modal("show");
+
+                    // ✅ Hide progress bar after scan completes
+                    $("#progress, #progressBar, .progress").fadeOut();
+                    sessionStorage.removeItem("progressVisible"); // ✅ Remove progress bar state
+
+                    // ✅ Check if files exist and restore sync button if needed
+                    checkFilesTable();
+
+                    // ✅ When the user confirms, reload the page
+                    $("#scanCompleteModal").off("hidden.bs.modal").on("hidden.bs.modal", function () {
+                        location.reload(); // 🔄 Reload the page after modal is closed
+                    });
                 }
             },
             error: function () {
                 console.error("Error polling scan progress.");
-                resetButtons();
             }
         });
-    }, 2000); // Poll every 2 seconds
+    }, 2000);
 }
 
-function fetchLiveResults() {
-    // Immediately fetch results once
-    fetchResults();
 
-    // Set interval to fetch results dynamically
-    fetchInterval = setInterval(fetchResults, 3000);
-}
-
-// Function to fetch results
-function fetchResults() {
-    $.ajax({
-        url: 'fetch_scan_results.php',  // Endpoint to get latest results
-        type: 'GET',
-        dataType: 'json',
-        success: function (response) {
-            if (response.status === 'success') {
-                const files = response.files;
-
-                // Update list and grid views dynamically
-                updateListView(files);
-                updateGridView(files);
-            } else {
-                console.error("Error fetching live results:", response.message);
-            }
-        },
-        error: function () {
-            console.error("Error fetching live results.");
-        }
-    });
-}
-
-// Reset Buttons and UI
-function resetButtons() {
-    $("#stopScan").hide();
-    $("#startScan").show();
-}
-
-// Update Progress Bar
+// ✅ Function to update progress bar
 function updateProgressBar(progress) {
     $("#progress").text(`Progress: ${progress}%`);
     $("#progressBar").css("width", `${progress}%`).attr("aria-valuenow", progress);
 }
 
-// Function to reset the progress bar
-function resetProgressBar() {
-    $("#progress").text("Progress: 0%"); // Reset text
-    $("#progressBar")
-        .css("width", "0%")             // Reset visual width
-        .attr("aria-valuenow", 0);      // Reset accessibility value
+// ✅ Restore Progress Bar State After Refresh
+function restoreProgressBarState() {
+    let progressVisible = sessionStorage.getItem("progressVisible");
+
+    if (progressVisible === "true") {
+        $("#progress, #progressBar, .progress").show(); // ✅ Keep progress bar visible
+        pollProgress(); // ✅ Resume polling if scan is ongoing
+    } else {
+        $("#progress, #progressBar, .progress").hide(); // ✅ Keep progress bar hidden if no scan
+    }
 }
 
-// Update List View
-function updateListView(files) {
-    const tbody = $("#table-body");
-    tbody.empty();
-    files.forEach(file => {
-        const row = `
-            <tr>
-                <td>
-                    <input type="checkbox" class="row-checkbox" value="${file.fileurl}">
-                </td>
-                <td>
-                    <img src="${file.fileurl}" alt="Thumbnail" style="max-width: 50px; cursor: pointer;"
-                        onclick="openPreview('${file.fileurl}', '${file.filetype}')">
-                </td>
-                <td>${file.filename}</td>
-                <td>${file.filetype}</td>
-                <td>${file.fileurl}</td>
-                <td>${file.dateupload}</td>
-            </tr>`;
-        tbody.append(row);
+
+
+// ✅ Function to Fetch Data AFTER Sync Completes
+function fetchScanResults() {
+    $.ajax({
+        url: 'fetch_scan_results.php', // ✅ Fetch data after sync
+        type: 'GET',
+        dataType: 'json',
+        success: function (response) {
+            if (response.status === 'success') {
+                appendToListView(response.files); // ✅ Append to Main Table
+                appendToGridView(response.files); // ✅ Append to Grid View
+            } else {
+                console.error("Error fetching scan results:", response.message);
+            }
+        },
+        error: function () {
+            console.error("Error fetching scan results.");
+        }
     });
 }
 
-// Update Grid View
-function updateGridView(files) {
+
+
+
+// ✅ Append Data to Main List-Table
+function appendToListView(files) {
+    const tbody = $("#fileTable tbody");
+
+    files.forEach(file => {
+        const filePath = file.filepath;
+        const row = `
+            <tr data-type="${file.filetype}" data-path="${filePath}">
+                <td><input type="checkbox" class="row-checkbox" value="${filePath}"></td>
+                <td><img src="${file.fileurl}" style="max-width: 50px; cursor: pointer;" 
+                         onclick="openPreview('${file.fileurl}', '${file.filetype}')"></td>
+                <td>${file.filename}</td>
+                <td>${file.filetype}</td>
+                <td class="shortened-path">${filePath}</td>
+                <td>${file.dateupload || 'N/A'}</td>
+                <td>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-danger dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cogs"></i> Actions
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('${filePath}', '${file.filename}')">
+                                <i class="fas fa-i-cursor"></i> Rename</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('${filePath}')">
+                                <i class="fas fa-copy"></i> Copy</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('${filePath}')">
+                                <i class="fas fa-download"></i> Download</a></li>
+                            <li><a class="dropdown-item text-danger" href="javascript:void(0);" onclick="moveToTrash('${filePath}', '${file.filename}')">
+                                <i class="fas fa-trash"></i> Move to Trash</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>`;
+
+        tbody.append(row);
+    });
+
+    // ✅ Refresh DataTable if needed
+    if ($.fn.DataTable.isDataTable("#fileTable")) {
+        $("#fileTable").DataTable().destroy();
+    }
+    $("#fileTable").DataTable();
+}
+
+// ✅ Append Data to Grid View
+function appendToGridView(files) {
     const gridContainer = $("#grid-view");
-    gridContainer.empty();
+
     files.forEach(file => {
         const item = `
-            <div class="grid-item">
+            <div class="grid-item" data-path="${file.filepath}">
                 <img src="${file.fileurl}" alt="${file.filename}" onclick="openPreview('${file.fileurl}', '${file.filetype}')"
                     style="max-width: 100%; cursor: pointer;">
                 <div class="file-info">
@@ -874,103 +1278,266 @@ function updateGridView(files) {
         gridContainer.append(item);
     });
 }
-
-
-
-// Event Listeners
-$("#startScan").on("click", startScan);
-$("#stopScan").on("click", stopScan);
 </script>
 
 
 
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const searchBar = document.getElementById("search-bar");
+    const suggestionsList = document.getElementById("suggestions");
+
+    async function fetchSuggestions(query) {
+        if (query.length === 0) {
+            suggestionsList.style.display = "none";
+            return;
+        }
+
+        try {
+            const response = await fetch(`fetch_tags2.php?query=${encodeURIComponent(query)}`);
+            const suggestions = await response.json();
+
+            suggestionsList.innerHTML = "";
+            if (suggestions.length > 0) {
+                suggestions.forEach(suggestion => {
+                    let suggestionItem = document.createElement("div");
+                    suggestionItem.textContent = suggestion;
+                    suggestionItem.onclick = function () {
+                        searchBar.value = suggestion;
+                        suggestionsList.style.display = "none";
+                    };
+                    suggestionsList.appendChild(suggestionItem);
+                });
+                suggestionsList.style.display = "block";
+            } else {
+                suggestionsList.style.display = "none";
+            }
+        } catch (error) {
+            console.error("Error fetching suggestions:", error);
+        }
+    }
+
+    // Event listener for search input
+    searchBar.addEventListener("input", function () {
+        fetchSuggestions(this.value);
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener("click", function (event) {
+        if (!searchBar.contains(event.target) && !suggestionsList.contains(event.target)) {
+            suggestionsList.style.display = "none";
+        }
+    });
+});
+
+
+</script>
 
 
 <!-- JavaScript -->
 <script>
-    $(document).ready(function () {
-         // Initialize the DataTable with responsive features
-    const table = $('#fileTable').DataTable({
+$(document).ready(function () {
+    let currentFilter = "all"; // Store independent filter state
+    let showingType = ""; // Track the current dataset
+    let originalHTML = $('#fileTable tbody').html(); // Store the original table HTML
+    let originalColumns = $('#fileTable thead tr').html(); // Store the original table header
+
+    let table = $('#fileTable').DataTable({
         paging: true,
         searching: true,
         responsive: true,
         lengthChange: true,
         pageLength: 10,
         order: [[4, 'desc']],
-        autoWidth: false, // Prevent fixed column widths
+        autoWidth: false,
     });
 
-
-    // Listen for window resize and redraw the table
-    $(window).on('resize', function () {
-        table.columns.adjust().responsive.recalc();
-    });
-
-        const tableBody = $('#table-body');
-        const listView = $('#list-view');
-        const gridView = $('#grid-view');
-
-     // Toggle List/Grid view
+    // ✅ Independent List/Grid View Toggle
     $('#list-view-btn').on('click', function () {
-        listView.show();
-        gridView.addClass('d-none');
+        $('#list-view').show();
+        $('#grid-view').addClass('d-none');
         $(this).addClass('btn-primary').removeClass('btn-outline-secondary');
         $('#grid-view-btn').addClass('btn-outline-secondary').removeClass('btn-primary');
     });
 
-
     $('#grid-view-btn').on('click', function () {
-        listView.hide();
-        gridView.removeClass('d-none');
+        $('#list-view').hide();
+        $('#grid-view').removeClass('d-none');
         $(this).addClass('btn-primary').removeClass('btn-outline-secondary');
         $('#list-view-btn').addClass('btn-outline-secondary').removeClass('btn-primary');
     });
-      
 
-          // Handle the change event of the radio buttons
+    // ✅ Independent File Type Filtering
     $('input[name="filter-filetype"]').on('change', function () {
-        const selectedType = $(this).val();
-
-        if (selectedType === 'all') {
-            // Show all rows
-            $('tr, .grid-item').show();
-        } else {
-            // Hide all rows and only show those that match the selected type
-            $('tr, .grid-item').hide();
-            $(`tr[data-type="${selectedType}"], .grid-item[data-type="${selectedType}"]`).show();
-        }
+        currentFilter = $(this).val();
+        applyFilter();
     });
 
-        // Toggle duplicates
-        let showingDuplicates = false;
-        $('#toggle-duplicates').on('click', function () {
-            const btn = $(this);
-            btn.text(showingDuplicates ? `Show Duplicates (${<?php echo $duplicateCount; ?>})` : 'Hide Duplicates');
-            showingDuplicates = !showingDuplicates;
-
-            if (showingDuplicates) {
-                tableBody.html('');
-                <?php foreach ($duplicates as $file): ?>
-                tableBody.append(`
-                    <tr data-type="<?php echo htmlspecialchars($file['filetype']); ?>">
-                        <td class="thumbnail">
-                            <img src="<?php echo convertFilePathToURL($file['filepath']); ?>" alt="Thumbnail">
-                        </td>
-                        <td><?php echo htmlspecialchars($file['filename']); ?></td>
-                        <td><?php echo htmlspecialchars($file['filetype']); ?></td>
-                        <td class="shortened-path"><?php echo htmlspecialchars($file['filepath']); ?></td>
-                        <td><?php echo htmlspecialchars($file['dateupload']); ?></td>
-                        <td>
-                            <button class="btn btn-danger btn-sm" onclick="deleteMedia('<?php echo $file['filepath']; ?>', '<?php echo $file['filename']; ?>')">Delete</button>
-                        </td>
-                    </tr>
-                `);
-                <?php endforeach; ?>
-            } else {
-                location.reload();
-            }
+    function applyFilter() {
+        $('#fileTable tbody tr').each(function () {
+            const rowType = $(this).attr("data-type");
+            $(this).toggle(currentFilter === "all" || rowType === currentFilter);
         });
+    }
+
+    // ✅ Function to Append Data Without Resetting Pagination, Filters, and Views
+    function toggleData(type, btnId, endpoint, responseKey) {
+        const btn = $(btnId);
+        const tableBody = $('#fileTable tbody');
+        const tableHead = $('#fileTable thead tr');
+
+        if (showingType !== type) {
+            $.ajax({
+                url: endpoint,
+                type: 'GET',
+                dataType: 'json',
+                success: function (response) {
+                    if (response.success) {
+                        table.clear().destroy();
+                        tableBody.html('');
+
+                        // ✅ Remove old dynamic columns before adding a new one
+                        tableHead.html(originalColumns); // Reset the table header
+                        let extraColumnHeader = "";
+                        if (type === "Objects") {
+                            extraColumnHeader = '<th class="dynamic-column">Detected Objects</th>';
+                        } else if (type === "Emotions") {
+                            extraColumnHeader = '<th class="dynamic-column">Emotions</th>';
+                        } else if (type === "Duplicates") {
+                            extraColumnHeader = '<th class="dynamic-column">Original File</th>';
+                        }
+
+                        if (extraColumnHeader) {
+                            tableHead.find('th:last').before(extraColumnHeader);
+                        }
+
+                        response[responseKey].forEach((file) => {
+                            const fileURL = convertFilePathToURL(file.filepath);
+                            const fileType = file.filetype;
+                            const truncatedPath = file.filepath.length > 50 ? file.filepath.substring(0, 50) + "..." : file.filepath;
+
+                            let thumbnailHTML = fileType.match(/(jpg|jpeg|png|gif)$/i)
+                                ? `<img src="${fileURL}" class="thumbnail" 
+                                    style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;"
+                                    onclick="openPreview('${fileURL}', '${fileType}')">`
+                                : fileType.match(/(mp4|mov|avi)$/i)
+                                ? `<video src="${fileURL}" class="thumbnail" muted 
+                                    style="width: 60px; height: 60px; object-fit: cover;"
+                                    onclick="openPreview('${fileURL}', '${fileType}')"></video>`
+                                : `<span>No Preview</span>`;
+
+                            let extraColumnData = type === "Objects"
+                                ? (Array.isArray(file.detected_objects) ? file.detected_objects.join(", ") : file.detected_objects || 'N/A')
+                                : type === "Emotions"
+                                ? file.emotion || 'N/A'
+                                : type === "Duplicates"
+                                ? file.original_filename || 'N/A'
+                                : "";
+
+                            let actionsColumn = type === "Duplicates"
+                                ? `<button class="btn btn-danger btn-sm" onclick="deleteMedia('${file.filepath}', '${file.filename}')">
+                                    <i class="fas fa-trash-alt"></i> Delete
+                                   </button>`
+                                : `<div class="dropdown">
+                                        <button class="btn btn-sm btn-danger dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            <i class="fas fa-cogs"></i> Actions
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('${file.filepath}', '${file.filename}')">
+                                                <i class="fas fa-i-cursor"></i> Rename</a></li>
+                                            <li><a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('${file.filepath}')">
+                                                <i class="fas fa-copy"></i> Copy</a></li>
+                                            <li><a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('${file.filepath}')">
+                                                <i class="fas fa-download"></i> Download</a></li>
+                                            <li><a class="dropdown-item text-danger" href="javascript:void(0);" onclick="moveToTrash('${file.filepath}', '${file.filename}')">
+                                                <i class="fas fa-trash"></i> Move to Trash</a></li>
+                                        </ul>
+                                   </div>`;
+
+                            tableBody.append(`
+                                <tr data-type="${file.filetype}" data-path="${file.filepath}">
+                                    <td><input type="checkbox" class="row-checkbox" value="${file.filepath}"></td>
+                                    <td>${thumbnailHTML}</td>
+                                    <td>${file.filename}</td>
+                                    <td>${file.filetype}</td>
+                                    <td class="shortened-path">${truncatedPath}</td>
+                                    <td>${file.datecreated || 'N/A'}</td>
+                                    <td>${extraColumnData}</td>
+                                    <td>${actionsColumn}</td>
+                                </tr>
+                            `);
+                        });
+
+                        table = $('#fileTable').DataTable({
+                            paging: true,
+                            searching: true,
+                            responsive: true,
+                            lengthChange: true,
+                            pageLength: 10,
+                            order: [[4, 'desc']],
+                            autoWidth: false,
+                        });
+
+                        applyFilter();
+
+                        btn.text(`Hide ${type}`);
+                        showingType = type;
+                    } else {
+                        alert(`No ${type.toLowerCase()} found.`);
+                        btn.text(`Show ${type}`);
+                        showingType = "";
+                    }
+                },
+                error: function () {
+                    console.error(`Error fetching ${type.toLowerCase()}.`);
+                }
+            });
+        } else {
+            // ✅ Fix: Restore the original main table dataset when hiding toggled data
+            table.clear().destroy();
+            $('#fileTable thead tr').html(originalColumns); // Restore original headers
+            $('#fileTable tbody').html(originalHTML); // Restore original table content
+
+            table = $('#fileTable').DataTable({
+                paging: true,
+                searching: true,
+                responsive: true,
+                lengthChange: true,
+                pageLength: 10,
+                order: [[4, 'desc']],
+                autoWidth: false,
+            });
+
+            showingType = "";
+            btn.text(`Show ${type}`);
+        }
+    }
+
+    // ✅ Toggle Buttons
+    $('#showDuplicates').on('click', function () {
+        toggleData('Duplicates', '#showDuplicates', 'fetch_duplicates.php', 'duplicates');
     });
+
+    $('#showDetectedObjects').on('click', function () {
+        toggleData('Objects', '#showDetectedObjects', 'fetch_detected_objects.php', 'files');
+    });
+
+    $('#showEmotions').on('click', function () {
+        toggleData('Emotions', '#showEmotions', 'fetch_emotion.php', 'files');
+    });
+
+    function convertFilePathToURL(filePath) {
+    return filePath.replace('/Applications/XAMPP/xamppfiles/htdocs', 'http://172.16.152.47');
+}
+
+});
+
+
+
+
+
+
+
 
     function openPreview(fileUrl, fileType) {
     const overlay = document.getElementById('file-preview-overlay');
@@ -998,6 +1565,9 @@ $("#stopScan").on("click", stopScan);
 
 let currentFiles = []; // Array to store the list of files (url, type)
 let currentIndex = 0;  // Index to track the currently previewed file
+
+
+///OPEN MODAL FOR GRID VIEW
 
 // Function to open the modal and preview the file
 function openModal(fileUrl, fileType) {
@@ -1033,276 +1603,240 @@ function openModal(fileUrl, fileType) {
     overlay.style.display = 'flex'; // Show the overlay
 }
 
-// Function to close the preview modal
-function closePreview() {
-    document.getElementById('file-preview-overlay').style.display = 'none';
-}
 
 
-// Function to move a file to trash
+
+
+// ✅ Trigger Modal Before Executing Any Action
 function moveToTrash(filePath, fileName) {
-    if (!confirm(`Are you sure you want to move "${fileName}" to Trash?`)) {
-        return; // User canceled the action
-    }
+    openConfirmationModal("move_to_trash", filePath, fileName);
+}
 
-    // Send AJAX request to move the file
-    $.ajax({
-        url: 'moveToTrash.php', // The PHP endpoint
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ filepath: filePath, fileName: fileName }),
-        success: function (response) {
-            try {
-                const jsonResponse = typeof response === 'string' ? JSON.parse(response) : response;
+function renameMedia(filePath, fileName) {
+    let row = $(`tr[data-path="${filePath}"]`);
+    let latestFileName = row.find("td:nth-child(3)").text().trim(); // Get latest filename
 
-                if (jsonResponse.status === 'success') {
-                    alert('File moved to trash successfully!');
-                    // Optionally remove the row from the table or refresh the page
-                    $(`tr[data-filepath="${filePath}"]`).remove(); // Example to remove the table row dynamically
-                } else {
-                    alert('Error: ' + jsonResponse.message);
-                }
-            } catch (e) {
-                console.error('Error parsing response:', e);
-                alert('An unexpected error occurred.');
-            }
-        },
-        error: function (xhr) {
-            console.error('AJAX Error:', xhr.responseText);
-            alert('An error occurred while moving the file to trash.');
-        }
-    });
+    openConfirmationModal("rename", filePath, latestFileName); // Use latest filename
 }
 
 
-// Publish Media
-async function publishMedia(filePath) {
-    try {
-        const response = await fetch('publishMedia.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filepath: filePath.trim() })
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            alert('File published successfully!');
-            location.reload(); // Reload to update the list
-        } else {
-            alert('Error publishing file: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error publishing file:', error);
-        alert('An error occurred while publishing the file.');
-    }
-}
-
-// Rename Media
-async function renameMedia(filePath, fileName) {
-    const newName = prompt('Enter the new name for the file:', fileName);
-    if (!newName) return;
-
-    try {
-        const response = await fetch('rename_file.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filePath: filePath, newName: newName })
-        });
-        const result = await response.json();
-        if (result.success) {
-            alert('File renamed successfully!');
-            const row = document.querySelector(`tr[data-type] input[value="${filePath}"]`).closest('tr');
-            row.querySelector('td:nth-child(3)').textContent = newName; // Update file name in table
-        } else {
-            alert('Error renaming file: ' + result.error);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('An error occurred while renaming the file.');
-    }
-}
-
-// Copy Media
 function copyMedia(filePath) {
-    fetch('copy_file.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: filePath }) // Use filePath directly without decoding
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok.');
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            alert('File copied successfully!');
-            location.reload(); // Reload to reflect the new copied file
-        } else {
-            alert('Error copying file: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error copying file:', error);
-        alert('An error occurred while copying the file.');
-    });
+    openConfirmationModal("copy", filePath, "");
 }
-
 
 function downloadMedia(filePath) {
-    const downloadUrl = `download_file.php?file=${encodeURIComponent(filePath)}`;
-    window.location.href = downloadUrl; // Directly initiate the download
+    openConfirmationModal("download", filePath, "");
+}
+
+function deleteMedia(filePath, fileName, isTrash = false) {
+    openConfirmationModal(isTrash ? "delete_trash" : "delete", filePath, fileName);
 }
 
 
 
-// Delete Media
-async function deleteMedia(filePath, fileName) {
-    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) return;
+function openConfirmationModal(action, filePath, fileName) {
+    let modalTitle = "";
+    let modalMessage = "";
 
-    try {
-        const response = await fetch('deleteMedia.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filepath: filePath, fileName: fileName })
-        });
-        const result = await response.json();
-        if (result.status === 'success') {
-            alert('File deleted successfully!');
-            // Dynamically remove row from table
-            const row = document.querySelector(`tr[data-type] input[value="${filePath}"]`).closest('tr');
-            if (row) row.remove();
-        } else {
-            alert('Error deleting file: ' + result.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('An error occurred while deleting the file.');
+    if (action === "rename") {
+        modalTitle = "Confirm Rename";
+        modalMessage = `Enter the new name for: <br><br>
+                        <strong>${fileName}</strong>
+                        <br><br>
+                        <input type="text" id="newFileName" class="form-control" value="${fileName}">`;
+    } else if (action === "move_to_trash") {
+        modalTitle = "Confirm Move to Trash";
+        modalMessage = `Are you sure you want to move this file to trash? <br><br>
+                        <strong>${fileName}</strong>`;
+    } else if (action === "copy") {
+        modalTitle = "Confirm Copy";
+        modalMessage = `Are you sure you want to create a duplicate of this file?`;
+    } else if (action === "download") {
+        modalTitle = "Confirm Download";
+        modalMessage = `You are about to download this file.`;
+    } else if (action === "delete") {
+        modalTitle = "Confirm Deletion";
+        modalMessage = `Are you sure you want to delete this file? <br><br>
+                        <strong>${fileName}</strong>`;
+    } else if (action === "delete_trash") {
+        modalTitle = "Confirm Permanent Deletion";
+        modalMessage = `Are you sure you want to permanently delete this file from TRASH? <br><br>
+                        <strong>${fileName}</strong>`;
     }
+
+    $("#confirmationModalLabel").html(modalTitle);
+    $("#confirmationModalBody").html(modalMessage);
+    $("#confirmationModal").modal("show");
+
+    // ✅ Attach Event Listener for Proceed Button
+    $("#confirmActionBtn").off("click").on("click", function () {
+        $("#confirmationModal").modal("hide");
+        executeAction(action, filePath, fileName);
+    });
 }
 
 
 
-// Checkbox Select All
-
-$("#select-all").on("click", function () {
-    $(".file-checkbox").prop("checked", this.checked);
-});
-
-$(document).ready(function () {
-    const $bulkActions = $('#bulk-actions'); // Bulk actions container
-    const $selectAll = $('#select-all'); // Select all checkbox
-    const $rowCheckboxes = $('.row-checkbox'); // Individual row checkboxes
-    const $bulkDelete = $('#bulk-delete'); // Bulk delete button
-    const $bulkDownload = $('#bulk-download'); // Bulk download button
-
-    // Function to toggle bulk actions visibility
-    function toggleBulkActions() {
-        const anyChecked = $('.row-checkbox:checked').length > 0;
-        $bulkActions.toggle(anyChecked); // Show or hide bulk actions
-    }
-
-    // Handle "Select All" checkbox
-    $selectAll.on('change', function () {
-        const isChecked = $(this).is(':checked');
-        $rowCheckboxes.prop('checked', isChecked); // Check/uncheck all
-        toggleBulkActions();
-    });
-
-    // Handle individual row checkbox change
-    $(document).on('change', '.row-checkbox', function () {
-        const allChecked = $('.row-checkbox:checked').length === $rowCheckboxes.length;
-        $selectAll.prop('checked', allChecked); // Update "Select All" checkbox
-        toggleBulkActions();
-    });
-
-    // Bulk Delete Action
-    $bulkDelete.on('click', function () {
-        const selectedFiles = $('.row-checkbox:checked').map(function () {
-            return $(this).val(); // Collect file paths
-        }).get();
-
-        if (selectedFiles.length === 0) {
-            alert('No files selected.');
+function executeAction(action, filePath, fileName) {
+    if (action === "rename") {
+        const newFileName = $("#newFileName").val().trim();
+        if (!newFileName) {
+            showErrorModal("New filename cannot be empty.");
             return;
         }
-
-        if (confirm(`Are you sure you want to delete ${selectedFiles.length} file(s)?`)) {
-            $.ajax({
-                url: 'bulkActionsHandler.php',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({ action: 'delete', selectedFiles: selectedFiles }),
-                success: function (response) {
-                    try {
-                        const jsonResponse = typeof response === 'string' ? JSON.parse(response) : response;
-
-                        if (jsonResponse.status === 'success') {
-                            alert('Files deleted successfully!');
-                            // Remove rows dynamically from table
-                            selectedFiles.forEach(filePath => {
-                                $(`tr[data-path="${filePath}"]`).remove();
-                            });
-                            toggleBulkActions(); // Hide bulk actions
-                        } else {
-                            alert('Error: ' + jsonResponse.message);
-                        }
-                    } catch (e) {
-                        console.error('Error parsing response:', e);
-                        alert('Unexpected error occurred.');
-                    }
-                },
-                error: function (xhr) {
-                    console.error('AJAX Error:', xhr.responseText);
-                    alert('An error occurred while deleting the files.');
-                }
-            });
-        }
-    });
-
-    // Bulk Download Action
-$bulkDownload.on('click', function () {
-    const selectedFiles = $('.row-checkbox:checked').map(function () {
-        return $(this).val(); // Collect file paths
-    }).get();
-
-    if (selectedFiles.length === 0) {
-        alert('No files selected.');
-        return;
+        renameMediaAction(filePath, newFileName);
+    } else if (action === "move_to_trash") {
+        moveToTrashAction(filePath, fileName);
+    } else if (action === "delete") {
+        deleteMediaAction(filePath, fileName);
+    } else if (action === "delete_trash") {
+        deleteMediaAction(filePath, fileName, true);
+    } else if (action === "copy") {
+        copyMediaAction(filePath);
+    } else if (action === "download") {
+        downloadMediaAction(filePath);
     }
+}
 
+
+function moveToTrashAction(filePath, fileName) {
     $.ajax({
-        url: 'bulkActionsHandler.php',
+        url: 'moveToTrash.php',
         type: 'POST',
+        data: JSON.stringify({ filepath: decodeURIComponent(filePath), fileName: fileName }),
         contentType: 'application/json',
-        data: JSON.stringify({ action: 'download', selectedFiles: selectedFiles }),
-        success: function (response) {
-            try {
-                const jsonResponse = typeof response === 'string' ? JSON.parse(response) : response;
-
-                if (jsonResponse.status === 'success' && jsonResponse.zipLink) {
-                    window.open(jsonResponse.zipLink, '_blank'); // Open ZIP file link
-                } else {
-                    alert('Error: ' + jsonResponse.message);
-                }
-            } catch (e) {
-                console.error('Error parsing response:', e);
-                alert('Unexpected error occurred.');
+        dataType: 'json',
+        success: function (data) {
+            if (data.status === 'success') {
+                showSuccessModal(`File <strong>${fileName}</strong> moved to trash successfully.`);
+                $(`tr[data-path="${filePath}"]`).remove();
+            } else {
+                showErrorModal('Error: ' + data.message);
             }
         },
         error: function (xhr) {
-            console.error('AJAX Error:', xhr.responseText);
-            alert('An error occurred while generating the download file.');
+            console.error('Error moving file to trash:', xhr.responseText);
+            showErrorModal('An unexpected error occurred.');
         }
     });
-});
+}
 
 
-    // Initially hide the bulk actions
-    $bulkActions.hide();
-});
+
+function renameMediaAction(filePath, newFileName) {
+    $.ajax({
+        url: 'rename_file.php',
+        type: 'POST',
+        data: JSON.stringify({ filePath: decodeURIComponent(filePath), newName: newFileName }),
+        contentType: 'application/json',
+        dataType: 'json',
+        success: function (result) {
+            if (result.success) {
+                showSuccessModal(`File renamed successfully to <strong>${newFileName}</strong>.`);
+
+                let row = $(`tr[data-path="${filePath}"]`);
+                
+                // ✅ Update the file name displayed in the table
+                row.find("td:nth-child(3)").text(newFileName); // Ensure correct column index
+
+                // ✅ Update the `data-path` attribute with the new file path
+                let newFilePath = filePath.replace(/[^/]+$/, newFileName);
+                row.attr("data-path", newFilePath);
+
+                // ✅ Update actions (Move, Delete, etc.) with the new file path
+                row.find(".dropdown-item").each(function () {
+                    let onclickValue = $(this).attr("onclick");
+                    if (onclickValue) {
+                        $(this).attr("onclick", onclickValue.replace(filePath, newFilePath));
+                    }
+                });
+
+                // ✅ If rename modal is open, update its input field to match the new name
+                if ($("#renameModal").is(":visible")) {
+                    $("#newFileName").val(newFileName);
+                }
+
+            } else {
+                showErrorModal('Error renaming file: ' + result.error);
+            }
+        },
+        error: function (xhr) {
+            console.error('Error:', xhr.responseText);
+            showErrorModal('An error occurred while renaming the file.');
+        }
+    });
+}
+
+
+
+
+function copyMediaAction(filePath) {
+    $.ajax({
+        url: 'copy_file.php',
+        type: 'POST',
+        data: JSON.stringify({ filePath: decodeURIComponent(filePath) }),
+        contentType: 'application/json',
+        dataType: 'json',
+        success: function (response) {
+            if (response.success) {
+                showSuccessModal("File copied successfully!");
+            } else {
+                showErrorModal('Error copying file: ' + response.message);
+            }
+        },
+        error: function (xhr) {
+            console.error('Error copying file:', xhr.responseText);
+            showErrorModal('An error occurred while copying the file.');
+        }
+    });
+}
+
+
+
+
+
+
+function downloadMediaAction(filePath) {
+    const downloadUrl = `download_file.php?file=${encodeURIComponent(filePath)}`;
+    window.location.href = downloadUrl;
+    showSuccessModal("File downloaded successfully.");
+}
+
+
+
+
+async function deleteMediaAction(filePath, fileName, isTrash = false) {
+    try {
+        const response = await fetch('delete_file.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ filepath: filePath })
+        });
+
+        const textResponse = await response.text();
+        if (textResponse.trim() === "success") {
+            showSuccessModal(`File <strong>${fileName}</strong> deleted successfully.`);
+            $(`tr[data-path="${filePath}"]`).remove();
+        } else {
+            showErrorModal("Error deleting file: " + textResponse);
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        showErrorModal("An error occurred while deleting the file.");
+    }
+}
+
+
+function showSuccessModal(message) {
+    $("#successModalBody").html(message);
+    $("#successModal").modal("show");
+}
+
+function showErrorModal(message) {
+    $("#errorModalBody").html(message);
+    $("#errorModal").modal("show");
+}
+
 
 
 

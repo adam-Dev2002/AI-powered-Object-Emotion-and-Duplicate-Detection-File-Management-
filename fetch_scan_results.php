@@ -1,39 +1,66 @@
 <?php
-require 'config.php'; // Ensure database configuration works
+require 'config.php'; // ✅ Ensure database connection works
 
-// Define the function locally to avoid errors
+// ✅ Function to convert stored file paths to local URLs
 function convertFilePathToURL($filePath) {
-    $baseDirectory = '/Volumes';
-    $baseURL = 'http://172.16.152.45:8000'; // Adjust this as needed
-    return str_replace($baseDirectory, $baseURL, $filePath);
+    $baseDirectory = '/Applications/XAMPP/xamppfiles/htdocs/testcreative'; // ✅ Adjusted for XAMPP
+    $baseURL = 'http://localhost/testcreative'; // ✅ Local Apache server
+
+    // ✅ Fix: Check if file path is already a URL, if so, return as is
+    if (filter_var($filePath, FILTER_VALIDATE_URL)) {
+        return $filePath;
+    }
+
+    // ✅ Fix: Ensure the file path matches the base directory
+    if (strpos($filePath, $baseDirectory) === 0) {
+        $relativePath = substr($filePath, strlen($baseDirectory));
+        return $baseURL . '/' . ltrim($relativePath, '/');
+    }
+
+    return $filePath; // ✅ Return as-is if outside base directory
 }
 
-header('Content-Type: application/json'); // Ensure JSON response
+// ✅ Set JSON response headers
+header('Content-Type: application/json');
 
 try {
-    // Database connection
-    $pdo = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // ✅ Fix: Ensure we fetch only recently scanned files with correct paths
+    $query = "SELECT id, filename, filetype, filepath, dateupload 
+              FROM files 
+              WHERE last_scanned IS NOT NULL  -- ✅ Only fetch recently scanned files
+              ORDER BY last_scanned DESC, dateupload DESC 
+              LIMIT 20";
 
-    // Fetch last scanned files
-    $stmt = $pdo->query("SELECT id, filename, filetype, filepath, dateupload FROM files ORDER BY dateupload DESC LIMIT 20");
-    $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $result = $conn->query($query);
 
-    // Process data for JSON response
+    if (!$result) {
+        throw new Exception("Database query failed: " . $conn->error);
+    }
+
+    $files = $result->fetch_all(MYSQLI_ASSOC); // ✅ Fetch as associative array
+
     $results = [];
     foreach ($files as $file) {
+        // ✅ Fix: Convert stored paths to correct URLs
         $fileUrl = convertFilePathToURL($file['filepath']);
+
+        // ✅ Fix: Ensure the file actually exists before returning it
+        if (!file_exists($file['filepath'])) {
+            continue; // Skip files that do not exist
+        }
+
         $results[] = [
             'id' => $file['id'],
             'filename' => htmlspecialchars($file['filename']),
             'filetype' => htmlspecialchars($file['filetype']),
-            'filepath' => htmlspecialchars($file['filepath']),
-            'fileurl' => $fileUrl,
+            'filepath' => htmlspecialchars($file['filepath']), // ✅ Keep original local path
+            'fileurl' => $fileUrl, // ✅ Corrected URL path
             'dateupload' => htmlspecialchars($file['dateupload'])
         ];
     }
-    echo json_encode(['status' => 'success', 'files' => $results]);
+
+    echo json_encode(['status' => 'success', 'files' => $results], JSON_PRETTY_PRINT); // ✅ Return JSON
 } catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); // ✅ Error handling
 }
 ?>

@@ -1,22 +1,34 @@
 <?php
 require 'head.php';
-require 'config.php';
+require "config.php";
+require 'login-check.php';
 
 $pageTitle = 'Media Publishing';
 
-// Function to convert file paths to publicly accessible URLs
+    // Set the base directory path
+$base_directory = '/Applications/XAMPP/xamppfiles/htdocs/testcreative';
+$current_directory = isset($_GET['dir']) ? urldecode($_GET['dir']) : $base_directory;
+
+    
 function convertFilePathToURL($filePath) {
-    $baseDirectory = '/Volumes/creative';
-    $baseURL = 'http://172.16.152.45:8000/creative';
+    // Detect if running locally or on the server
+    $isLocal = ($_SERVER['SERVER_ADDR'] === '127.0.0.1' || $_SERVER['SERVER_NAME'] === 'localhost');
 
-    // Replace the base directory with the base URL
-    $relativePath = str_replace($baseDirectory, '', $filePath);
+    // Define base paths dynamically
+    $basePath = '/Applications/XAMPP/xamppfiles/htdocs/testcreative';
+    $baseURL = $isLocal ? 'http://localhost/testcreative' : 'http://172.16.152.47/testcreative';
 
-    // Encode special characters in the URL
-    $urlPath = str_replace(' ', '%20', $relativePath);
-
-    return $baseURL . '/' . ltrim($urlPath, '/');
+    // Ensure the file path is inside the base directory
+    if (strpos($filePath, $basePath) === 0) {
+        $relative_path = substr($filePath, strlen($basePath)); // Get relative path
+        $relative_path = ltrim($relative_path, '/'); // Remove leading slash
+        return $baseURL . '/' . str_replace(' ', '%20', $relative_path); // Convert spaces to %20
+    }
+    
+    return $filePath; // Return original path if invalid
 }
+
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -26,129 +38,133 @@ function convertFilePathToURL($filePath) {
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 
+
+
+<!-- FontAwesome (For Icons) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <title>Media Publishing</title>
     <style>
-        /* Styles */
-        .file-path-wrapper {
-            max-width: 300px;
-            white-space: nowrap;
+        /* Grid View Styles */
+    .grid-view {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 10px; /* Add spacing between grid items */
+    }
+
+    .grid-view .grid-item {
+        display: flex;
+        flex-direction: column;
+        width: 23%;
+        margin-bottom: 15px;
+        text-align: center;
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .grid-view .grid-item:hover {
+        transform: scale(1.03); /* Slight zoom effect on hover */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .grid-view img, .grid-view video {
+        width: 100%;
+        max-height: 150px;
+        object-fit: cover;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        cursor: pointer;
+    }
+
+    .grid-view .file-info {
+        text-align: center;
+        font-size: 14px;
+    }
+
+    .grid-view .actions {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-around;
+        gap: 5px;
+    }
+
+    .grid-view .actions button {
+        font-size: 12px;
+    }
+        .thumbnail img {
+            max-width: 50px;
+            max-height: 50px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .shortened-path {
+            max-width: 200px;
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
-
-       
-
         #file-preview-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background-color: rgba(0, 0, 0, 0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            overflow: hidden;
-        }
-
-        #file-preview-content {
-            max-width: 95vw;
-            max-height: 95vh;
-        }
-
-        .preview-media {
-            width: 100%;
-            height: auto;
-            object-fit: contain;
-        }
-
-        #close-preview-btn {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 2rem;
-            color: white;
-            background: none;
-            border: none;
-            cursor: pointer;
-            z-index: 1100;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1050; /* Ensures the modal is above the header */
+    }
+    #file-preview-content {
+        max-width: 80%;
+        max-height: 80%;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 8px;
+        padding: 10px;
+        position: relative;
+    }
+    #file-preview-close {
+        position: absolute;
+                top: 20px; /* Adjusted position from the top */
+                left: 20px; /* Adjusted position from the left */
+                font-size: 2rem; /* Font size for the close button */
+                color: white; /* Color set to white for visibility */
+                background: none; /* No background */
+                border: none; /* No border */
+                cursor: pointer; /* Pointer cursor on hover */
+                z-index: 1100; /* Ensure it’s above everything else */
+                margin-top: 40px; /* Adjust this value as needed */
+    }
+    .dataTables_filter
+        {
+            display:none;
         }
 
         .table-responsive {
-            overflow-x: auto;
-        }
-
-        .datatable {
-            table-layout: auto;
-            width: 100%;
-        }
-
-        .datatable th, .datatable td {
-            white-space: nowrap;
-            text-align: left;
-        }
-
-        /* Ensure buttons are aligned properly */
-.btn-group .btn {
-    padding: 6px 12px;
-    border-radius: 5px;
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.btn-group .btn.active {
-    background-color: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-
-.btn-group .btn:not(.active):hover {
-    background-color: #e9ecef;
-    color: #495057;
-}
-
-.d-flex.justify-content-end {
-    margin-bottom: 10px;
-}
-
-/* Optional: Styling tweaks for a cleaner layout */
-.table-responsive {
-    margin-top: 10px;
-}
-
-.datatable {
-    table-layout: auto;
     width: 100%;
+    overflow-x: auto; /* Ensure scrollbars appear when needed */
 }
-
-.datatable th, .datatable td {
-    white-space: nowrap;
-    text-align: left;
-}
-
-
-/* Style the buttons to be more compact */
-.btn-group .btn {
-    padding: 8px 12px; /* Adjust padding for icon-only buttons */
-    font-size: 18px; /* Increase icon size */
-}
-
-.btn-group .btn i {
-    margin: 0; /* Remove any margin around the icon */
-}
-
-.btn-group .btn.active {
-    background-color: #007bff; /* Active button background */
-    color: white;
-    border-color: #007bff;
-}
-
-.btn-group .btn:not(.active):hover {
-    background-color: #e9ecef;
-    color: #495057;
-}
-
-
+    
     </style>
 </head>
 <body>
@@ -167,16 +183,19 @@ function convertFilePathToURL($filePath) {
 <!-- Buttons for List View and Grid View -->
 <div class="d-flex justify-content-end mb-2">
     <div class="btn-group" role="group" aria-label="View Toggle">
-        <!-- List View Button with Icon -->
         <button type="button" class="btn btn-outline-primary active" id="listViewBtn" onclick="switchToListView()">
-            <i class="fas fa-list"></i> <!-- Font Awesome List Icon -->
+        <i class="fas fa-list"></i> List
         </button>
-        <!-- Grid View Button with Icon -->
         <button type="button" class="btn btn-outline-secondary" id="gridViewBtn" onclick="switchToGridView()">
-            <i class="fas fa-th-large"></i> <!-- Font Awesome Grid Icon -->
+            <i class="fas fa-th-large"></i> Grid
         </button>
     </div>
 </div>
+
+
+
+
+
 
 
 
@@ -200,68 +219,174 @@ function convertFilePathToURL($filePath) {
         </thead>
         <tbody>
             <?php
-            $query = "
-            SELECT p.p_id AS published_id, f.filename, f.filepath, f.filetype
-            FROM publish p
-            INNER JOIN files f ON CONVERT(p.filepath USING utf8mb4) = CONVERT(f.filepath USING utf8mb4)
-            ORDER BY p.p_id DESC;
-            ";
+$query = "
+(
+    SELECT 
+        f.id AS file_id, 
+        CONVERT(f.filename USING utf8mb4) COLLATE utf8mb4_unicode_ci AS filename, 
+        CONVERT(f.filepath USING utf8mb4) COLLATE utf8mb4_unicode_ci AS filepath, 
+        CONVERT(f.filetype USING utf8mb4) COLLATE utf8mb4_unicode_ci AS filetype, 
+        COALESCE(f.album_id, 0) AS album_id,  -- ✅ Ensures album_id is not NULL
+        COALESCE(CONVERT(a.name USING utf8mb4) COLLATE utf8mb4_unicode_ci, '') AS album_name, -- ✅ Replace NULL with an empty string
+        NULL AS publish_id, 
+        NULL AS publish_filename, 
+        NULL AS publish_type, 
+        NULL AS publish_filepath,
+        'album' AS source_type  -- Identify this as an 'album' entry
+    FROM files f
+    LEFT JOIN albums a ON f.album_id = a.id
+    WHERE f.album_id IS NOT NULL AND f.album_id != ''
+)
 
-            $result = $conn->query($query);
+UNION ALL
 
-            if ($result && $result->num_rows > 0) {
-                while ($row = $result->fetch_assoc()) {
-                    $filePath = $row['filepath'];
-                    $fileName = $row['filename'];
-                    $fileType = htmlspecialchars($row['filetype']);
-                    $fileURL = convertFilePathToURL($filePath);
+(
+    SELECT 
+        p.p_id AS file_id,  -- ✅ Use publish_id instead of NULL for consistency
+        CONVERT(p.filename USING utf8mb4) COLLATE utf8mb4_unicode_ci AS filename, 
+        CONVERT(p.filepath USING utf8mb4) COLLATE utf8mb4_unicode_ci AS filepath, 
+        CONVERT(p.type USING utf8mb4) COLLATE utf8mb4_unicode_ci AS filetype, 
+        0 AS album_id,  -- ✅ Assign a default value (e.g., 0) instead of NULL
+        '' AS album_name, -- ✅ Empty string instead of NULL to maintain column structure
+        p.p_id AS publish_id, 
+        CONVERT(p.filename USING utf8mb4) COLLATE utf8mb4_unicode_ci AS publish_filename, 
+        CONVERT(p.type USING utf8mb4) COLLATE utf8mb4_unicode_ci AS publish_type, 
+        CONVERT(p.filepath USING utf8mb4) COLLATE utf8mb4_unicode_ci AS publish_filepath,
+        'publish' AS source_type  -- Identify this as a 'publish' entry
+    FROM publish p
+)
 
-                    // Generate thumbnail preview
-                    $thumbnail = '';
-                    if (preg_match('/(jpg|jpeg|png|gif)$/i', $fileType)) {
-                        $thumbnail = "<img src='" . htmlspecialchars($fileURL) . "' alt='Thumbnail' class='thumbnail' style='width: 60px; height: 60px; object-fit: cover;'>";
-                    } elseif (preg_match('/(mp4|mov|avi)$/i', $fileType)) {
-                        $thumbnail = "<video src='" . htmlspecialchars($fileURL) . "' class='thumbnail' style='width: 60px; height: 60px; object-fit: cover;' muted></video>";
-                    } else {
-                        $thumbnail = "<span>No Preview</span>";
-                    }
+ORDER BY source_type ASC, album_name ASC, filename ASC;
 
-                    echo "<tr data-path='" . htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8') . "'>";
-                    echo "<td><input type='checkbox' class='rowCheckbox'></td>";
-                    echo "<td>{$thumbnail}</td>";
-                    echo "<td>
-                            <a href='javascript:void(0);' 
-                               onclick=\"openModal('" . htmlspecialchars($fileURL) . "', '" . htmlspecialchars($fileType) . "')\" 
-                               style='text-decoration: none; color: inherit;'>
-                                " . htmlspecialchars($fileName) . "
-                            </a>
-                          </td>";
-                    echo "<td>" . htmlspecialchars($fileType) . "</td>";
-                    echo "<td class='file-path-column'>
-                            <a href='" . htmlspecialchars($fileURL) . "' target='_blank' class='file-path'>" 
-                            . htmlspecialchars(str_replace('http://172.16.152.45:8000/creative/', '', $fileURL)) . "
-                            </a>
-                          </td>";
-                    echo "<td>
-                            <div class='dropdown'>
-                                <button class='btn btn-sm btn-danger dropdown-toggle' type='button' data-bs-toggle='dropdown'>
-                                    <i class='fas fa-cogs'></i> Actions
-                                </button>
-                                <ul class='dropdown-menu'>
-                                    <li><a class='dropdown-item' href='javascript:void(0);'>Action 1</a></li>
-                                    <li><a class='dropdown-item' href='javascript:void(0);'>Action 2</a></li>
-                                </ul>
-                            </div>
-                          </td>";
-                    echo "</tr>";
-                }
-            } else {
-                echo "<tr><td colspan='6'>No files or folders found.</td></tr>";
-            }
-            ?>
+";
+
+        
+          
+
+$result = $conn->query($query);
+
+if ($result && $result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $filePath = $row['filepath'];
+        $fileName = $row['filename'];
+        $fileType = strtolower(htmlspecialchars($row['filetype'])); // Convert to lowercase for consistency
+
+        // ✅ Use convertFilePathToURL() to get the correct local URL
+        $fileURL = convertFilePathToURL($filePath);
+
+        // ✅ Generate thumbnail preview
+        $thumbnail = '';
+        if (preg_match('/\.(jpg|jpeg|png|gif)$/i', $filePath)) {
+            $thumbnail = "<img src='" . htmlspecialchars($fileURL) . "' 
+                          alt='Thumbnail' class='thumbnail' 
+                          style='width: 60px; height: 60px; object-fit: cover;'>";
+        } elseif (preg_match('/\.(mp4|mov|avi)$/i', $filePath)) {
+            $thumbnail = "<video src='" . htmlspecialchars($fileURL) . "' 
+                          class='thumbnail' 
+                          style='width: 60px; height: 60px; object-fit: cover;' muted></video>";
+        } else {
+            $thumbnail = "<span>No Preview</span>"; // Default text if no preview is available
+        }
+
+        echo "<tr data-path='" . htmlspecialchars($filePath, ENT_QUOTES, 'UTF-8') . "'>";
+        echo "<td><input type='checkbox' class='rowCheckbox'></td>";
+        echo "<td>{$thumbnail}</td>";
+        echo "<td>
+                <a href='javascript:void(0);' 
+                   onclick=\"openModal('" . htmlspecialchars($fileURL) . "', '" . htmlspecialchars($fileType) . "')\" 
+                   style='text-decoration: none; color: inherit;'>
+                    " . htmlspecialchars($fileName) . "
+                </a>
+              </td>";
+        echo "<td>" . htmlspecialchars($fileType) . "</td>";
+        echo "<td class='file-path-column'>
+                <a href='" . htmlspecialchars($fileURL) . "' target='_blank' class='file-path'>" 
+                . htmlspecialchars($fileURL) . "
+                </a>
+              </td>";
+              echo "<td>
+              <div class='dropdown'>
+                  <button class='btn btn-sm btn-danger dropdown-toggle' type='button' id='dropdownActions-" . htmlspecialchars($fileName) . "' data-bs-toggle='dropdown' aria-expanded='false'>
+                      <i class='fas fa-cogs'></i> Actions
+                  </button>
+                  <ul class='dropdown-menu' aria-labelledby='dropdownActions-" . htmlspecialchars($fileName) . "'>
+                      <li>
+                          <a class='dropdown-item' href='javascript:void(0);' onclick=\"renameMedia('" . addslashes($filePath) . "', '" . addslashes($fileName) . "')\">
+                              <i class='fas fa-i-cursor'></i> Rename
+                          </a>
+                      </li>
+                      <li>
+                          <a class='dropdown-item text-danger' href='javascript:void(0);' onclick=\"unpublishMedia('" . addslashes($filePath) . "')\">
+                              <i class='fas fa-times'></i> Unpublish
+                          </a>
+                      </li>
+                  </ul>
+              </div>
+          </td>";
+      
+    }
+} else {
+    echo "<tr><td colspan='6'>No files or folders found.</td></tr>";
+}
+?>
+
+
         </tbody>
     </table>
 </div>
+
+
+<script>
+async function renameMedia(filePath, fileName) {
+    const newName = prompt('Enter the new name for the file:', fileName);
+    if (!newName) return;
+
+    try {
+        const response = await fetch('rename_file.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath: filePath, newName: newName })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            alert('File renamed successfully!');
+            location.reload(); // Refresh the page
+        } else {
+            alert('Error renaming file: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while renaming the file.');
+    }
+}
+
+
+async function unpublishMedia(publishId) {
+    if (!confirm("Are you sure you want to unpublish this file?")) return;
+
+    try {
+        const response = await fetch('unpublish_file.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `publish_id=${encodeURIComponent(publishId)}`
+        });
+
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert('File unpublished successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while unpublishing the file.');
+    }
+}
+
+
+</script>
 
 <script>
     // Initialize DataTables
@@ -395,71 +520,63 @@ document.addEventListener("DOMContentLoaded", function () {
 
 <!-- JavaScript for List/Grid View Toggle -->
 <script>
-// Function to Switch to List View
+// ✅ Fix: Ensure List/Grid View Toggles Properly
 function switchToListView() {
-    $("#grid-view").hide();  // Hide grid view
-    $("#table-view").show(); // Show table (list) view
+    $("#gridView").hide();  // Hide grid view
+    $("#listView").show(); // Show table (list) view
 
     $("#listViewBtn").addClass("btn-primary").removeClass("btn-secondary");
     $("#gridViewBtn").addClass("btn-secondary").removeClass("btn-primary");
 }
 
-// Function to Switch to Grid View
 function switchToGridView() {
-    $("#table-view").hide(); // Hide table (list) view
-    $("#grid-view").show();  // Show grid view
+    $("#listView").hide(); // Hide table (list) view
+    $("#gridView").show();  // Show grid view
 
     $("#gridViewBtn").addClass("btn-primary").removeClass("btn-secondary");
     $("#listViewBtn").addClass("btn-secondary").removeClass("btn-primary");
 }
 
-// Ensure both views have initial visibility
+// ✅ Fix: Initialize Toggle State on Load
 $(document).ready(function () {
-    $("#grid-view").hide(); // Initially hide grid view
-    $("#table-view").show(); // Initially show list view
+    $("#gridView").hide(); // Initially hide grid view
+    $("#listView").show(); // Show list view by default
 });
 
+// ✅ Fix: Ensure File Preview Works
+function openModal(fileUrl, fileType) {
+    const overlay = document.getElementById("file-preview-overlay");
+    const content = document.getElementById("file-preview-content");
 
-</script>
+    content.innerHTML = ""; // Clear previous content
 
-
-<!-- File Preview Modal -->
-<div id="file-preview-overlay">
-    <button id="close-preview-btn" onclick="closePreview()">&#10005;</button>
-    <div id="file-preview-content"></div>
-</div>
-
-<script>
-    function openModal(fileUrl, fileType) {
-        const overlay = document.getElementById("file-preview-overlay");
-        const content = document.getElementById("file-preview-content");
-        content.innerHTML = "";
-
-        if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
-            const img = document.createElement("img");
-            img.src = fileUrl;
-            img.className = "preview-media";
-            content.appendChild(img);
-        } else if (fileType.match(/(mp4|mp3|wav|mov)$/i)) {
-            const video = document.createElement("video");
-            video.src = fileUrl;
-            video.className = "preview-media";
-            video.controls = true;
-            content.appendChild(video);
-        } else {
-            const text = document.createElement("p");
-            text.textContent = "Preview not available.";
-            content.appendChild(text);
-        }
-
-        overlay.style.display = "flex";
+    if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
+        const img = document.createElement("img");
+        img.src = fileUrl;
+        img.className = "preview-media";
+        content.appendChild(img);
+    } else if (fileType.match(/(mp4|mp3|wav|mov)$/i)) {
+        const video = document.createElement("video");
+        video.src = fileUrl;
+        video.className = "preview-media";
+        video.controls = true;
+        content.appendChild(video);
+    } else {
+        const text = document.createElement("p");
+        text.textContent = "Preview not available.";
+        content.appendChild(text);
     }
 
-    function closePreview() {
-        const overlay = document.getElementById("file-preview-overlay");
-        overlay.style.display = "none";
-    }
+    overlay.style.display = "flex";
+}
+
+// ✅ Fix: Ensure Closing Works
+function closePreview() {
+    const overlay = document.getElementById("file-preview-overlay");
+    overlay.style.display = "none";
+}
 </script>
+
 <script src="assets/js/main.js"></script>
 
 <?php require 'footer.php'; ?>

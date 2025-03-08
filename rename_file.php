@@ -1,55 +1,64 @@
 <?php
-// Include database configuration
 require_once 'config.php';
-
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Decode JSON input
     $data = json_decode(file_get_contents('php://input'), true);
 
-    // Validate input data
     if (isset($data['filePath']) && isset($data['newName'])) {
-        $filePath = trim($data['filePath']); // Existing file path
-        $newName = trim($data['newName']);   // New file name
+        $filePath = trim($data['filePath']); // ✅ Absolute path to file or folder
+        $newName = trim($data['newName']);
 
-        // Construct the new file path
+        if (!file_exists($filePath)) {
+            echo json_encode(['success' => false, 'error' => 'Path does not exist.']);
+            exit();
+        }
+
         $directory = dirname($filePath);
         $newPath = $directory . '/' . $newName;
 
-        // Step 1: Rename the file in the filesystem
-        if (file_exists($filePath)) {
-            if (rename($filePath, $newPath)) {
-                // Step 2: Update the database
-                $stmt = $conn->prepare("UPDATE files SET filepath = ?, filename = ? WHERE filepath = ?");
-                $stmt->bind_param("sss", $newPath, $newName, $filePath);
-
-                if ($stmt->execute()) {
-                    // Successful response
-                    echo json_encode(['success' => true, 'message' => 'File renamed successfully.']);
-                } else {
-                    // Database update failed
-                    echo json_encode(['success' => false, 'error' => 'Failed to update database: ' . $conn->error]);
-                }
-
-                $stmt->close();
+        if (rename($filePath, $newPath)) {
+            if (is_dir($newPath)) {
+                echo json_encode([
+                    'success' => true, 
+                    'message' => 'Folder renamed successfully.', 
+                    'newFilePath' => $newPath,
+                    'newFileName' => $newName
+                ]);
             } else {
-                // Filesystem rename failed
-                echo json_encode(['success' => false, 'error' => 'Failed to rename file in the filesystem.']);
+                // ✅ Update file path and name in the 'files' table
+                $stmtFiles = $conn->prepare("UPDATE files SET filepath = ?, filename = ? WHERE filepath = ?");
+                $stmtFiles->bind_param("sss", $newPath, $newName, $filePath);
+                $stmtFiles->execute();
+                $stmtFiles->close();
+
+                // ✅ Update file path and name in the 'album_files' table
+                $stmtAlbumFiles = $conn->prepare("UPDATE album_files SET filepath = ?, filename = ? WHERE filepath = ?");
+                $stmtAlbumFiles->bind_param("sss", $newPath, $newName, $filePath);
+                $stmtAlbumFiles->execute();
+                $stmtAlbumFiles->close();
+
+                // ✅ Fetch the latest file name from the database
+                $stmtFetch = $conn->prepare("SELECT filename FROM files WHERE filepath = ?");
+                $stmtFetch->bind_param("s", $newPath);
+                $stmtFetch->execute();
+                $stmtFetch->bind_result($latestFileName);
+                $stmtFetch->fetch();
+                $stmtFetch->close();
+
+                echo json_encode([
+                    'success' => true, 
+                    'message' => 'File renamed successfully in both tables.', 
+                    'newFilePath' => $newPath,
+                    'newFileName' => $latestFileName // ✅ Return latest file name
+                ]);
             }
         } else {
-            // File does not exist
-            echo json_encode(['success' => false, 'error' => 'File does not exist.']);
+            echo json_encode(['success' => false, 'error' => 'Failed to rename.']);
         }
     } else {
-        // Missing input parameters
         echo json_encode(['success' => false, 'error' => 'Invalid input parameters.']);
     }
-} else {
-    // Invalid request method
-    echo json_encode(['success' => false, 'error' => 'Invalid request method.']);
 }
-
-// Close the database connection
 $conn->close();
 ?>

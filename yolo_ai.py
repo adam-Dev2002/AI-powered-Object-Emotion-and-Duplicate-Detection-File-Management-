@@ -12,6 +12,7 @@ from watchdog.events import FileSystemEventHandler
 import time
 from deepface import DeepFace  # Added for emotion detection
 
+
 # Load YOLO models for detection, classification, and pose
 models = {
     'detection': YOLO('yolo11n.pt'),         # Object Detection
@@ -20,10 +21,15 @@ models = {
 }
 
 # Confidence threshold for storing detections
-CONFIDENCE_THRESHOLD = 0.1
+CONFIDENCE_THRESHOLD = 0.8  # or higher depending on your results
 
-# AFP volume path
-AFP_VOLUME_PATH = '/Volumes/creative/Hara All About/HARA sa FU 2025/Photoshoot'
+
+# Local folder path
+LOCAL_FOLDER_PATH = '/Applications/XAMPP/xamppfiles/htdocs/testcreative'
+# ✅ Define TRASH folder path to exclude from scanning
+TRASH_FOLDER_PATH = os.path.join(LOCAL_FOLDER_PATH, 'TRASH')
+
+
 
 
 # MySQL Database Connection
@@ -32,8 +38,8 @@ def get_db_connection():
         connection = mysql.connector.connect(
             host="localhost",
             user="root",
-            password="capstone2425",
-            database="greyhound_creative",
+            password="",
+            database="fm_system",
             autocommit=True  # Ensure changes are saved permanently
         )
         return connection
@@ -49,16 +55,30 @@ db = get_db_connection()
 image_extensions = {'jpg', 'jpeg', 'png', 'gif'}
 video_extensions = {'mp4', 'avi', 'mov'}
 
-# Check if AFP volume is mounted
-def check_afp_volume():
-    base_volume = '/Volumes/creative'
-    if not os.path.ismount(base_volume):
-        print(f"Error: AFP base volume '{base_volume}' is not mounted.")
+
+
+
+def construct_web_url(file_path):
+    """Ensure the stored file path is absolute and correctly formatted."""
+    base_path = "/Applications/XAMPP/xamppfiles/htdocs/testcreative"
+
+    if not file_path.startswith(base_path):
+        # Ensure correct absolute path formatting
+        absolute_path = os.path.join(base_path, file_path.lstrip(os.sep))
+        absolute_path = absolute_path.replace("\\", "/")  # Ensure forward slashes
+        return absolute_path  # ✅ Store the absolute path
+    return file_path  # Already absolute, return as is
+
+
+
+
+# Check if local folder exists
+def check_local_folder():
+    if not os.path.exists(LOCAL_FOLDER_PATH):
+        print(f"Error: Target folder '{LOCAL_FOLDER_PATH}' does not exist.")
         sys.exit(1)
-    if not os.path.exists(AFP_VOLUME_PATH):
-        print(f"Error: Target folder '{AFP_VOLUME_PATH}' does not exist.")
-        sys.exit(1)
-    print(f"AFP volume '{AFP_VOLUME_PATH}' is mounted and accessible.")
+    print(f"Local folder '{LOCAL_FOLDER_PATH}' is accessible.")
+
 
 
 
@@ -72,20 +92,48 @@ def get_file_creation_date(filepath):
         print(f"Error retrieving creation date for {filepath}: {e}")
         return None
 
-def populate_missing_columns(file_id, filepath):
-    """Populate missing columns in the database."""
+def populate_missing_columns(filepath):
+    """Ensure file exists in the database and populate missing columns, including AI scanning."""
     try:
         with db.cursor(dictionary=True) as cursor:
-            # Check for missing metadata
+            # Check if file already exists based on its path
+            cursor.execute("SELECT id FROM files WHERE filepath = %s", (filepath,))
+            result = cursor.fetchone()
+
+            if not result:
+                # File is missing in the database, so insert it
+                filehash = calculate_filehash(filepath)
+                datecreated = get_file_creation_date(filepath)
+
+                cursor.execute("""
+                    INSERT INTO files (filename, filepath, filetype, size, datecreated, filehash) 
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    os.path.basename(filepath),  # Extract filename
+                    filepath,
+                    filepath.split('.')[-1].lower(),  # File type
+                    os.path.getsize(filepath),  # File size
+                    datecreated,
+                    filehash
+                ))
+                
+                db.commit()
+                file_id = cursor.lastrowid
+                print(f"Inserted missing file into the database: {filepath} (ID: {file_id})")
+
+                # New file - must be processed by AI
+                process_file(file_id, filepath, filepath.split('.')[-1].lower())
+                print(f"AI processing completed for newly inserted file ID {file_id}")
+
+            else:
+                file_id = result['id']
+
+            # Now check and populate missing columns
             cursor.execute("""
                 SELECT datecreated, filehash, detected_objects, classification, pose, gesture, emotion 
                 FROM files WHERE id = %s
             """, (file_id,))
             result = cursor.fetchone()
-
-            if not result:
-                print(f"Error: File with ID {file_id} not found.")
-                return
 
             # Extract missing fields
             datecreated = result.get('datecreated')
@@ -110,16 +158,17 @@ def populate_missing_columns(file_id, filepath):
                     cursor.execute("UPDATE files SET filehash = %s WHERE id = %s", (new_filehash, file_id))
                     print(f"Populated filehash for file ID {file_id}")
 
-            # Populate detected_objects, classification, pose, gesture, and emotion
+            # AI Processing: Populate detected_objects, classification, pose, gesture, and emotion
             file_type = filepath.split('.')[-1].lower()
             if not detected_objects or not classification or not pose or not gesture or not emotion:
-                process_file(file_id, filepath, file_type)
-                print(f"Populated AI analysis results for file ID {file_id}")
+                process_file(file_id, filepath, file_type)  # Calls your AI for scanning
+                print(f"AI processing completed for file ID {file_id}")
 
             db.commit()
 
     except Exception as e:
-        print(f"Error populating missing columns for file ID {file_id}: {e}")
+        print(f"Error populating missing columns for file: {filepath} - {e}")
+
 
 
 
@@ -170,20 +219,7 @@ def calculate_filehash(filepath):
         return None
 
 # Check if file already exists in the database based on filehash
-def file_exists(filehash, content_hash):
-    """Check if a file with the same hash or AI content already exists."""
-    try:
-        with db.cursor(dictionary=True) as cursor:
-            query = "SELECT * FROM files WHERE filehash = %s OR content_hash = %s"
-            cursor.execute(query, (filehash, content_hash))
-            duplicates = cursor.fetchall()
-            if duplicates:
-                print(f"Duplicate detected based on filehash or content analysis: {duplicates}")
-                return True
-        return False
-    except Exception as e:
-        print(f"Error checking file existence: {e}")
-        return False
+
 
 
 
@@ -227,14 +263,29 @@ def interpret_gesture(keypoints):
 def scan_image(file_path):
     try:
         detection_results = models['detection'](file_path)
-        return [
-            models['detection'].names[int(box.cls)]
-            for box in detection_results[0].boxes
-            if box.conf >= CONFIDENCE_THRESHOLD
-        ]
+
+        detected_objects = []
+        bounding_boxes = []
+
+        for box in detection_results[0].boxes:
+            if box.conf >= CONFIDENCE_THRESHOLD:
+                label = models['detection'].names[int(box.cls)]  # Object label
+                x, y, w, h = box.xywh[0].tolist()  # Convert tensor to list (x, y, width, height)
+
+                detected_objects.append(label)
+                bounding_boxes.append({
+                    "label": label, 
+                    "x": x, "y": y, "width": w, "height": h,
+                    "confidence": float(box.conf)  # Store confidence score
+                })
+
+        return detected_objects, bounding_boxes
+
     except Exception as e:
         print(f"Error processing image {file_path}: {e}")
-        return []
+        return [], []
+
+
 
 def classify_image(file_path):
     try:
@@ -259,43 +310,129 @@ def estimate_pose(file_path):
         print(f"Error during pose estimation for {file_path}: {e}")
         return {"keypoints": [], "gesture": "Error during pose estimation"}
 
-# Improved duplicate handling to scan duplicates
-def alert_and_handle_duplicates(filehash, filepath):
+
+# ✅ Ensure the 'duplicate_of' column exists in the database
+def ensure_duplicate_column():
+    """Ensure that the `duplicate_of` column exists in the `files` table."""
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("""
+                SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'files' AND COLUMN_NAME = 'duplicate_of'
+            """)
+            column_exists = cursor.fetchone()[0]
+
+            if column_exists == 0:
+                cursor.execute("ALTER TABLE files ADD COLUMN duplicate_of INT NULL")
+                print("Added `duplicate_of` column to the `files` table.")
+        db.commit()
+    except Exception as e:
+        print(f"Error ensuring `duplicate_of` column: {e}")
+
+
+
+# ✅ Check if file already exists in the database based on filehash or content_hash
+def file_exists(filehash, content_hash):
+    """Check if a file with the same hash or AI content already exists and store duplicates."""
     try:
         with db.cursor(dictionary=True) as cursor:
-            cursor.execute("SELECT * FROM files WHERE filehash = %s", (filehash,))
-            duplicates = cursor.fetchall()
+            query = "SELECT id FROM files WHERE filehash = %s OR content_hash = %s"
+            cursor.execute(query, (filehash, content_hash))
+            
+            duplicate = cursor.fetchone()  # ✅ Fetch only one result
+            
+            if duplicate:
+                duplicate_id = duplicate['id']
+                print(f"Duplicate detected! This file matches file ID {duplicate_id}.")
 
-        if duplicates:
-            print(f"Duplicate detected for {filepath}: Existing files:")
-            for duplicate in duplicates:
-                print(f"- {duplicate['filepath']} (Uploaded on {duplicate['dateupload']})")
+                # ✅ Clear unread results
+                cursor.fetchall()  # Clears remaining results in case of multiple matches
+                
+                # ✅ Store the duplicate reference
+                cursor.execute("""
+                    UPDATE files 
+                    SET duplicate_of = %s 
+                    WHERE filehash = %s OR content_hash = %s
+                """, (duplicate_id, filehash, content_hash))
+
+                db.commit()
+                return duplicate_id  # ✅ Return duplicate file ID
+
+        return None  # No duplicate found
     except Exception as e:
-        print(f"Error checking duplicates: {e}")
+        print(f"Error checking and storing duplicate: {e}")
+        return None
 
 
 
 
-# Updated scan_and_process_directory function
+
+
+# ✅ Alert and handle duplicate detection properly
+def alert_and_handle_duplicates(filehash, content_hash, filepath):
+    """Mark the duplicate file in the database and store its reference."""
+    try:
+        duplicate_id = file_exists(filehash, content_hash)
+        
+        if duplicate_id:
+            print(f"Marking {filepath} as duplicate of file ID {duplicate_id}")
+
+            file_size = os.path.getsize(filepath)  # ✅ Get the file size
+
+            with db.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO files (filename, filepath, filehash, content_hash, filetype, size, duplicate_of)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    os.path.basename(filepath),
+                    construct_web_url(filepath),  # Store web-accessible path
+                    filehash,
+                    content_hash,
+                    filepath.split('.')[-1].lower(),
+                    file_size,  # ✅ Include the file size
+                    duplicate_id  # ✅ Reference to the original file
+                ))
+            db.commit()
+            return True
+        
+        return False  # No duplicate found
+    except Exception as e:
+        print(f"Error handling duplicate file {filepath}: {e}")
+        return False
+
+
+
+
 def scan_and_process_directory(directory):
     print("Scanning directory and processing files...")
     start_time = time.time()
 
-    # Calculate total files for progress
-    total_files = sum([len(files) for _, _, files in os.walk(directory)])
+    total_files = 0
     processed_files = 0
 
+    # ✅ First Pass: Count total files (excluding TRASH)
     for root, _, files in os.walk(directory):
+        if TRASH_FOLDER_PATH in root:
+            print(f"Skipping TRASH folder: {root}")
+            continue
+        total_files += len(files)
+
+    # ✅ Second Pass: Process files
+    for root, _, files in os.walk(directory):
+        if TRASH_FOLDER_PATH in root:
+            print(f"Skipping TRASH folder: {root}")
+            continue
+
         for file in files:
             filepath = os.path.join(root, file)
             filetype = file.split('.')[-1].lower()
 
-            # Skip unsupported file types
+            # ✅ Skip unsupported file types
             if filetype not in image_extensions.union(video_extensions):
                 print(f"Skipping unsupported file: {file}")
                 continue
 
-            # Calculate filehash
+            # ✅ Calculate file hash
             filehash = calculate_filehash(filepath)
             content_hash = None  # Initialize content_hash
 
@@ -303,14 +440,15 @@ def scan_and_process_directory(directory):
                 print(f"Error: Unable to calculate filehash for {filepath}")
                 continue
 
-            # Check for duplicates
-            if file_exists(filehash, content_hash):
-                print(f"Duplicate detected: {filepath}")
-                alert_and_handle_duplicates(filehash, filepath)
-                continue
+            # ✅ Check for duplicates and store them properly
+            if alert_and_handle_duplicates(filehash, content_hash, filepath):
+                continue  # Skip further processing for duplicates
 
             try:
-                # Insert file metadata into the database
+                # ✅ Construct web URL for filepath
+                web_url = construct_web_url(filepath)
+
+                # ✅ Insert file metadata into the database
                 size = get_file_size(filepath)
                 creation_date = get_file_creation_date(filepath)
                 sql = """
@@ -321,7 +459,7 @@ def scan_and_process_directory(directory):
                 with db.cursor() as cursor:
                     cursor.execute(sql, (
                         os.path.basename(filepath),
-                        filepath,
+                        web_url,  # Store web-accessible file path
                         filehash,
                         filetype,
                         size,
@@ -331,7 +469,7 @@ def scan_and_process_directory(directory):
                     file_id = cursor.lastrowid
                 db.commit()
 
-                # Process the file and update AI results
+                # ✅ Process the file and update AI results
                 process_file(file_id, filepath, filetype)
 
                 processed_files += 1
@@ -344,6 +482,59 @@ def scan_and_process_directory(directory):
 
     end_time = time.time()
     print(f"Finished scanning. Time taken: {end_time - start_time:.2f} seconds.")
+
+
+
+
+def scan_video(file_path):
+    """Perform object detection on video frames and store bounding boxes."""
+    try:
+        cap = cv2.VideoCapture(file_path)
+        detected_objects = set()  # Use a set to avoid duplicate labels
+        bounding_boxes = []
+        frame_count = 0
+        frame_interval = 10  # Process every 10th frame
+        max_frames = 500  # Limit to avoid infinite processing
+
+        while cap.isOpened() and frame_count < max_frames:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_count % frame_interval == 0:
+                try:
+                    print(f"Processing frame {frame_count} of video: {file_path}")
+                    # Perform detection on the frame
+                    results = models['detection'](frame)
+
+                    for box in results[0].boxes:
+                        if box.conf >= CONFIDENCE_THRESHOLD:
+                            label = models['detection'].names[int(box.cls)]
+                            x, y, w, h = box.xywh[0].tolist()
+
+                            detected_objects.add(label)
+                            bounding_boxes.append({
+                                "label": label, 
+                                "x": x, "y": y, "width": w, "height": h,
+                                "confidence": float(box.conf)
+                            })
+
+                    print(f"Detected objects in frame {frame_count}: {list(detected_objects)}")
+
+                except Exception as e:
+                    print(f"Error detecting objects in video frame {frame_count}: {e}")
+
+            frame_count += 1
+
+        cap.release()
+        return list(detected_objects), bounding_boxes
+
+    except Exception as e:
+        print(f"Error processing video {file_path}: {e}")
+        return [], []
+
+
+
 
 
 
@@ -363,6 +554,7 @@ def calculate_content_hash(detected_objects, pose_gesture, emotions):
 # Process individual files
 def process_file(file_id, file_path, file_type):
     detected_objects = []
+    bounding_boxes = []
     classification = {}
     pose = {}
     gesture = "No gesture detected"
@@ -370,42 +562,42 @@ def process_file(file_id, file_path, file_type):
     content_hash = None  # Initialize content hash
 
     try:
+        web_url = construct_web_url(file_path)
+
         if file_type in image_extensions:
-            # Perform detection, classification, pose estimation, and emotion detection
-            detected_objects = scan_image(file_path) or []
+            detected_objects, bounding_boxes = scan_image(file_path) or ([], [])  # ✅ Now extracts bounding boxes
             classification = classify_image(file_path) or {}
             pose_data = estimate_pose(file_path) or {}
             pose = pose_data.get("keypoints", [])
             gesture = pose_data.get("gesture", "No gesture detected")
             emotion = detect_emotion(file_path) or "Unknown"
 
-            # Generate a content hash based on AI results
             combined_content = json.dumps({
                 "detected_objects": detected_objects,
                 "classification": classification,
                 "pose": pose,
                 "gesture": gesture,
-                "emotion": emotion
+                "emotion": emotion,
+                "bounding_boxes": bounding_boxes  # ✅ Store bounding boxes
             })
             content_hash = hashlib.sha256(combined_content.encode()).hexdigest()
 
         elif file_type in video_extensions:
-            # Process video files for detection and emotion analysis
-            detected_objects = scan_video(file_path) or []
+            detected_objects, bounding_boxes = scan_video(file_path) or ([], [])  # ✅ Now extracts bounding boxes
             emotion = analyze_emotion_in_video(file_path) or "Neutral"
 
-            # Generate a content hash for video AI results
             combined_content = json.dumps({
                 "detected_objects": detected_objects,
-                "emotion": emotion
+                "emotion": emotion,
+                "bounding_boxes": bounding_boxes  # ✅ Store bounding boxes
             })
             content_hash = hashlib.sha256(combined_content.encode()).hexdigest()
 
-        # Update the database with the results
+        # ✅ Update database with detected objects, bounding boxes, and AI results
         sql = """
             UPDATE files
             SET detected_objects = %s, classification = %s, pose = %s, 
-                gesture = %s, emotion = %s, content_hash = %s, last_scanned = %s
+                gesture = %s, emotion = %s, content_hash = %s, bounding_boxes = %s, last_scanned = %s
             WHERE id = %s
         """
         with db.cursor() as cursor:
@@ -416,13 +608,16 @@ def process_file(file_id, file_path, file_type):
                 gesture,
                 emotion,
                 content_hash,
+                json.dumps(bounding_boxes),  # ✅ Store bounding boxes in JSON format
                 datetime.now(),
                 file_id
             ))
         db.commit()
-        print(f"Updated file ID {file_id} with AI results and content_hash.")
+        print(f"Updated file ID {file_id} with AI results and bounding boxes.")
+
     except Exception as e:
         print(f"Error processing file ID {file_id}: {e}")
+
 
 
 
@@ -445,58 +640,43 @@ def analyze_emotion_in_video(video_path):
         emotions_detected = []
         frame_count = 0
         frame_interval = 30  # Analyze every 30 frames
+        max_frames = 300  # Limit the number of frames analyzed
 
-        while cap.isOpened():
+        while cap.isOpened() and frame_count < max_frames:
             ret, frame = cap.read()
             if not ret:
                 break
 
             if frame_count % frame_interval == 0:
                 try:
+                    print(f"Analyzing frame {frame_count} for emotion.")
                     result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
-                    emotions_detected.append(result[0]['dominant_emotion'])
-                except Exception:
-                    pass
+                    detected_emotion = result[0]['dominant_emotion']
+                    emotions_detected.append(detected_emotion)
+                    print(f"Emotion detected in frame {frame_count}: {detected_emotion}")
+                except Exception as e:
+                    print(f"Error analyzing emotion in frame {frame_count}: {e}")
             frame_count += 1
 
         cap.release()
-        return max(set(emotions_detected), key=emotions_detected.count, default="Neutral")
+        # Return the most frequent emotion detected
+        dominant_emotion = max(set(emotions_detected), key=emotions_detected.count, default="Neutral")
+        print(f"Dominant emotion for video {video_path}: {dominant_emotion}")
+        return dominant_emotion
     except Exception as e:
         print(f"Error processing video emotion: {e}")
         return "Neutral"
 
 
 
-# Monitor directory changes and trigger scan
-class TriggerHandler(FileSystemEventHandler):
-    def on_any_event(self, event):
-        if event.is_directory:
-            return  # Ignore directory changes
-        if event.event_type in ('created', 'modified'):
-            print(f"Detected {event.event_type} for file: {event.src_path}")
-            scan_and_process_directory(AFP_VOLUME_PATH)
 
-def monitor_directory():
-    """Start monitoring the directory for changes."""
-    event_handler = TriggerHandler()
-    observer = Observer()
-    observer.schedule(event_handler, path=AFP_VOLUME_PATH, recursive=True)
-    observer.start()
-    print(f"Monitoring directory: {AFP_VOLUME_PATH}")
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
 
 # Main execution
 if __name__ == "__main__":
     try:
-        check_afp_volume()
+        check_local_folder()
         ensure_required_columns()
-        scan_and_process_directory(AFP_VOLUME_PATH)
-        monitor_directory()
+        scan_and_process_directory(LOCAL_FOLDER_PATH)
     finally:
         db.close()
         print("Database connection closed.")

@@ -1,0 +1,8 @@
+# Ignore virtual environments and other heavy directories
+env/
+venv/
+yolo_env/
+downloads/
+forms/
+photos/
+
