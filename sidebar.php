@@ -4,6 +4,12 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get the current page name
 <aside id="sidebar" class="sidebar">
     
     <ul class="sidebar-nav" id="sidebar-nav">
+    <li class="nav-item">
+            <a class="nav-link <?= $current_page == 'index.php' ? 'active' : 'collapsed' ?>" href="index.php">
+                <i class="bi bi-grid"></i> <!-- Dashboard Icon -->
+                <span>Dashboard</span>
+            </a>
+        </li><!-- End Dashboard Nav -->
         <li class="nav-item">
             <a class="nav-link <?= $current_page == 'directory-listing.php' ? 'active' : 'collapsed' ?>" href="directory-listing.php">
                 <i class="bi bi-house-door"></i> <!-- Home Icon -->
@@ -18,12 +24,7 @@ $current_page = basename($_SERVER['PHP_SELF']); // Get the current page name
             </a>
         </li><!-- End Recent Nav -->
 
-        <li class="nav-item">
-            <a class="nav-link <?= $current_page == 'index.php' ? 'active' : 'collapsed' ?>" href="index.php">
-                <i class="bi bi-grid"></i> <!-- Dashboard Icon -->
-                <span>Dashboard</span>
-            </a>
-        </li><!-- End Dashboard Nav -->
+      
         
         <!-- iFound AI Navigation -->
         <li class="nav-item">

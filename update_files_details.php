@@ -2,49 +2,44 @@
 require 'config.php';
 header('Content-Type: application/json');
 
-$response = ['status' => 'error', 'message' => 'Invalid request.'];
+$data = json_decode(file_get_contents('php://input'), true);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $data = json_decode(file_get_contents('php://input'), true);
-    $filepath = $data['filepath'];
-    $filename = $data['filename'];
-    $tag = $data['tag'] ?? '';
-    $description = $data['description'] ?? '';
-
-    // Ensure required fields are provided
-    if (empty($filepath) || empty($filename)) {
-        $response['message'] = 'Filepath and filename are required.';
-        echo json_encode($response);
-        exit;
-    }
-
-    // Check if the path refers to a folder
-    $isFolder = is_dir($filepath);
-
-    if ($isFolder) {
-        // Rename the folder
-        $newPath = dirname($filepath) . '/' . $filename;
-        if (rename($filepath, $newPath)) {
-            $response['status'] = 'success';
-            $response['message'] = 'Folder renamed successfully.';
-        } else {
-            $response['message'] = 'Failed to rename the folder.';
-        }
-    } else {
-        // Update file details in the database
-        $stmt = $conn->prepare("UPDATE files SET filename = ?, tag = ?, description = ? WHERE filepath = ?");
-        $stmt->bind_param('ssss', $filename, $tag, $description, $filepath);
-
-        if ($stmt->execute()) {
-            $response['status'] = 'success';
-            $response['message'] = 'File details updated successfully.';
-        } else {
-            $response['message'] = 'Failed to update file details.';
-        }
-
-        $stmt->close();
-    }
+// Validate input
+if (!$data || !isset($data['filepath']) || !isset($data['featured'])) {
+    echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
+    exit;
 }
 
-echo json_encode($response);
-?>
+$filepath = trim($data['filepath']);
+$featured = (int)$data['featured'];
+
+// First, check if the filepath actually exists
+$checkStmt = $conn->prepare("SELECT id FROM files WHERE filepath = ?");
+$checkStmt->bind_param("s", $filepath);
+$checkStmt->execute();
+$checkStmt->store_result();
+
+if ($checkStmt->num_rows === 0) {
+    echo json_encode(['status' => 'error', 'message' => 'File not found']);
+    $checkStmt->close();
+    $conn->close();
+    exit;
+}
+
+$checkStmt->close();
+
+// Update 'featured' status explicitly
+$stmt = $conn->prepare("UPDATE files SET featured = ? WHERE filepath = ?");
+$stmt->bind_param("is", $featured, $filepath);
+$stmt->execute();
+
+// Check if update was successful
+if ($stmt->affected_rows > 0) {
+    $message = $featured ? 'Featured status set to Yes.' : 'Featured status set to No.';
+    echo json_encode(['status' => 'success', 'message' => $message]);
+} else {
+    echo json_encode(['status' => 'error', 'message' => 'No changes were made.']);
+}
+
+$stmt->close();
+$conn->close();

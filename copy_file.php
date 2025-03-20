@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
-    
+
     if (!isset($data['filePath']) || empty(trim($data['filePath']))) {
         echo json_encode(['success' => false, 'error' => 'Invalid file path received.']);
         exit();
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL)
         ");
         $stmt->bind_param("ssssssss", $newName, $newPath, $fileExtension, $size, $dateupload, $datecreated, $filehash, $content_hash);
-        
+
         if ($stmt->execute()) {
             echo json_encode(['success' => true, 'message' => 'File copied successfully.', 'newPath' => $newPath]);
         } else {

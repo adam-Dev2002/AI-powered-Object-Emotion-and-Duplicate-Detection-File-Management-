@@ -1,74 +1,83 @@
 <?php
 require_once 'config.php'; // Include database configuration
 
-$data = json_decode(file_get_contents('php://input'), true);
-
-if (isset($data['filepath'])) {
-    $filePath = trim($data['filepath']);
-
-    // Log for debugging
-    error_log("Delete request for: $filePath");
-
-    // Function to recursively delete directories
-    function deleteDirectory($dir) {
-        if (!file_exists($dir)) {
-            return true;
-        }
-        if (!is_dir($dir)) {
-            return unlink($dir);
-        }
-        foreach (scandir($dir) as $item) {
-            if ($item == '.' || $item == '..') continue;
-            if (!deleteDirectory($dir . DIRECTORY_SEPARATOR . $item)) {
-                return false;
-            }
-        }
-        return rmdir($dir);
-    }
-
-    if (is_dir($filePath)) {
-        // It's a directory; attempt to delete recursively
-        $deleted = deleteDirectory($filePath);
-    } else if (file_exists($filePath)) {
-        // It's a file; attempt to delete
-        $deleted = unlink($filePath);
-    } else {
-        // File or directory does not exist
-        echo json_encode(['status' => 'error', 'message' => 'File or directory not found.']);
-        $conn->close();
-        exit;
-    }
-
-    if ($deleted) {
-        // Delete the record from the 'files' table
-        $stmtFiles = $conn->prepare("DELETE FROM files WHERE filepath = ?");
-        $stmtFiles->bind_param("s", $filePath);
-        $stmtFiles->execute();
-        $stmtFiles->close();
-
-        // Delete the record from the 'album_files' table
-        $stmtAlbumFiles = $conn->prepare("DELETE FROM album_files WHERE filepath = ?");
-        $stmtAlbumFiles->bind_param("s", $filePath);
-        $stmtAlbumFiles->execute();
-        $stmtAlbumFiles->close();
-
-        // Check if both deletions were successful
-        if ($stmtFiles->affected_rows > 0 || $stmtAlbumFiles->affected_rows > 0) {
-            echo json_encode(['status' => 'success', 'message' => 'Item deleted successfully from filesystem and databases.']);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'Item deleted from filesystem, but no database records found.']);
-        }
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to delete the item from the filesystem.']);
-    }
-} else {
-    // If required parameters are missing
-    echo json_encode(['status' => 'error', 'message' => 'Missing required parameters.']);
+// Ensure database connection
+if (!isset($conn) || $conn->connect_error) {
+    die(json_encode(['status' => 'error', 'message' => 'Database connection failed.']));
 }
 
-// Close database connection
-$conn->close();
+// Decode JSON input
+$data = json_decode(file_get_contents('php://input'), true);
 
-// Log raw POST data for debugging
-error_log("Raw POST data: " . file_get_contents('php://input'));
+if (!isset($data['filepath']) || empty($data['filepath']) || !isset($data['fileName']) || empty($data['fileName'])) {
+    echo json_encode(['status' => 'error', 'message' => 'Invalid request. Missing file path or file name.']);
+    exit;
+}
+
+$filePath = trim($data['filepath']);
+$fileName = trim($data['fileName']);
+$featuredPath = '/Applications/XAMPP/xamppfiles/htdocs/testcreative/Featured';
+
+// Function to recursively delete directories
+function deleteDirectory($dir) {
+    if (!is_dir($dir)) return is_file($dir) ? unlink($dir) : false;
+
+    foreach (array_diff(scandir($dir), ['.', '..']) as $file) {
+        $filePath = "$dir/$file";
+        is_dir($filePath) ? deleteDirectory($filePath) : unlink($filePath);
+    }
+    return rmdir($dir);
+}
+
+// Attempt to delete the file or directory
+if (is_dir($filePath)) {
+    $deleted = deleteDirectory($filePath);
+} else if (file_exists($filePath)) {
+    $deleted = unlink($filePath);
+} else {
+    echo json_encode(['status' => 'error', 'message' => 'File or directory not found.']);
+    exit;
+}
+
+// If deletion was successful and it is within the specific path
+if ($deleted) {
+    if (strpos($filePath, $featuredPath) === 0) {
+        // Deletion in 'Featured' directory, handle album deletion logic
+        $stmtAlbum = $conn->prepare("SELECT id FROM albums WHERE name = ?");
+        $stmtAlbum->bind_param("s", $fileName);
+        $stmtAlbum->execute();
+        $result = $stmtAlbum->get_result();
+        if ($album = $result->fetch_assoc()) {
+            $albumId = $album['id'];
+            $stmtDeleteFiles = $conn->prepare("DELETE FROM album_files WHERE album_id = ?");
+            $stmtDeleteFiles->bind_param("i", $albumId);
+            $stmtDeleteFiles->execute();
+            $stmtDeleteFiles->close();
+
+            $stmtDeleteAlbum = $conn->prepare("DELETE FROM albums WHERE id = ?");
+            $stmtDeleteAlbum->bind_param("i", $albumId);
+            $stmtDeleteAlbum->execute();
+            $stmtDeleteAlbum->close();
+
+            echo json_encode(['status' => 'success', 'message' => 'Album and associated files deleted successfully.']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Album not found. No deletion performed on album_files.']);
+        }
+        $stmtAlbum->close();
+    } else {
+        // Deletion outside 'Featured' directory, delete from 'addfolder' table
+        $stmtDeleteFolder = $conn->prepare("DELETE FROM addfolder WHERE name = ?");
+        $stmtDeleteFolder->bind_param("s", $fileName);
+        if ($stmtDeleteFolder->execute()) {
+            echo json_encode(['status' => 'success', 'message' => 'Folder deleted successfully from addfolder table.']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Error deleting folder from addfolder table: ' . $stmtDeleteFolder->error]);
+        }
+        $stmtDeleteFolder->close();
+    }
+} else {
+    echo json_encode(['status' => 'error', 'message' => 'Failed to delete the folder in the file system.']);
+}
+
+$conn->close();
 ?>

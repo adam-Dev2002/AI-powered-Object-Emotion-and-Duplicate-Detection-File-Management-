@@ -117,6 +117,50 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } else {
         $login_err = "Please enter both employee ID and password.";
     }
+            // If API login fails, attempt local database authentication
+            if (!$result || !isset($result['status']) || $result['status'] !== 200) {
+                $stmt = $conn->prepare("SELECT employee_id, name, department, position, email_address, password FROM admin_users WHERE employee_id = ?");
+                $stmt->bind_param("s", $inputID);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $stmt->close();
+    
+                if ($result->num_rows == 1) {
+                    $user = $result->fetch_assoc();
+    
+                    // Verify password (plain text; consider hashing for security)
+                    if ($inputPassword === $user["password"]) {
+                        $_SESSION["logged"] = true;
+                        $_SESSION["employee_id"] = $user["employee_id"];
+                        $_SESSION["name"] = $user["name"];
+                        $_SESSION["department"] = $user["department"];
+                        $_SESSION["position"] = $user["position"];
+                        $_SESSION["email"] = $user["email_address"];
+    
+                        // Log login action
+                        $action = 'login';
+                        $details = "User {$inputID} logged in via local database.";
+                        $timestamp = date("Y-m-d H:i:s");
+    
+                        $log_stmt = $conn->prepare("
+                            INSERT INTO admin_activity_logs (admin_id, action, details, timestamp) 
+                            VALUES (?, ?, ?, ?)
+                        ");
+                        $log_stmt->bind_param("isss", $inputID, $action, $details, $timestamp);
+                        $log_stmt->execute();
+                        $log_stmt->close();
+    
+                        // Redirect to index.php after successful login
+                        header("Location: index.php");
+                        exit();
+                    } else {
+                        $login_err = "Invalid password.";
+                    }
+                } else {
+                    $login_err = "Invalid employee ID or password.";
+                }
+            }
+    
 }
 ?>
 
@@ -172,7 +216,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <form class="row g-3 needs-validation" method="POST" novalidate>
                                     <div class="col-12">
                                         <div class="input-group has-validation">
-                                            <span class="input-group-text" id="inputGroupPrepend">ID</span>
                                             <input type="text" name="employee_id" class="form-control" id="yourEmployeeID" placeholder="Employee ID" required>
                                             <div class="invalid-feedback">Please enter your employee ID.</div>
                                         </div>

@@ -11,8 +11,8 @@ if (!$employee_id) {
     exit;
 }
 
-// Fetch user details from the new database structure
-$sql = "SELECT employee_id, name FROM admin_users WHERE employee_id = ?";
+// Fetch user details from the new database structure (including role)
+$sql = "SELECT employee_id, name, role FROM admin_users WHERE employee_id = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $employee_id);
 $stmt->execute();
@@ -27,9 +27,11 @@ if (!$user) {
     exit;
 }
 
-// Fetch the latest 20 login activities by users
+// Fetch the latest 20 login activities by users,
+// including the role from admin_users for customizing the login message
 $logs = [];
-$log_sql = "SELECT admin_users.name AS user_name, admin_activity_logs.action, admin_activity_logs.details, admin_activity_logs.timestamp 
+$log_sql = "SELECT admin_users.employee_id, admin_users.name AS user_name, admin_users.role, 
+                   admin_activity_logs.action, admin_activity_logs.details, admin_activity_logs.timestamp 
             FROM admin_activity_logs 
             JOIN admin_users ON admin_activity_logs.admin_id = admin_users.employee_id 
             WHERE admin_activity_logs.action = 'LOGIN' 
@@ -41,12 +43,20 @@ $log_result = $log_stmt->get_result();
 $logs = $log_result->fetch_all(MYSQLI_ASSOC);
 $log_stmt->close();
 
-// Convert timestamps to Philippine Time and adjust for 4-hour discrepancy
+// Convert timestamps to Philippine Time and adjust for 4-hour discrepancy,
+// and update login details message to include the user's role with the first letter capitalized.
 date_default_timezone_set('Asia/Manila');
 foreach ($logs as &$log) {
-    $log['timestamp'] = date('Y-m-d H:i:s', strtotime($log['timestamp']) - 4 * 3600);
+    if ($log['action'] === 'LOGIN') {
+        // Capitalize the first letter of the role using ucfirst()
+        $role = ucfirst($log['role']);
+        $log['details'] = $role . " user " . htmlspecialchars($log['employee_id']) . " logged in.";
+    }
+    $log['timestamp'] = date('Y-m-d H:i:s', strtotime($log['timestamp']) - 5 * 3600);
 }
 ?>
+
+
 
 <!DOCTYPE html>
 <html lang="en">

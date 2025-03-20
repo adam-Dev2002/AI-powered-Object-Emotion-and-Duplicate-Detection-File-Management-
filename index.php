@@ -126,114 +126,90 @@ $pageTitle = 'Dashboard';
 <div id="storage-error" class="text-danger"></div>
 
 
-            <!-- Reports -->
-            <div class="col-12">
-              <div class="card">
-                <div class="card-body">
-                  <h5 class="card-title">Storage Overview</h5>
-            
-                  <!-- Line Chart -->
-                  <div id="storageChart"></div>
-            
-                  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        // Fetch storage data dynamically from storage_stats.php
-        fetch('storage_stats.php')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to load storage statistics.');
-                }
-                return response.json();
-            })
-            .then(stats => {
-                // Parse real-time data
-                const usedSpaceGB = parseFloat(stats.used_space.split(' ')[0]); // e.g., "23.83 GB"
-                const totalSpaceGB = parseFloat(stats.total_space.split(' ')[0]); // e.g., "28.20 TB"
-                const historicalData = Array.from({ length: 12 }, (_, i) => usedSpaceGB - (11 - i) * 0.1 > 0 ? usedSpaceGB - (11 - i) * 0.1 : 0); // Example decreasing data
+<!-- Reports -->
+<div class="col-12">
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Storage Overview</h5>
 
-                // Create the chart using real data
-                new ApexCharts(document.querySelector("#storageChart"), {
-                    series: [{
-                        name: 'Storage Used (GB)',
-                        data: historicalData // Use fetched or simulated data
-                    }],
-                    chart: {
-                        height: 350,
-                        type: 'area',
-                        toolbar: {
-                            show: false
-                        },
-                    },
-                    markers: {
-                        size: 5,
-                        colors: ['#4154f1'],
-                        strokeColors: '#ffffff',
-                        strokeWidth: 2,
-                        hover: {
-                            size: 7
-                        }
-                    },
-                    colors: ['#4154f1'],
-                    fill: {
-                        type: "solid",
-                        opacity: 0.2
-                    },
-                    dataLabels: {
-                        enabled: false
-                    },
-                    stroke: {
-                        curve: 'smooth',
-                        width: 3
-                    },
-                    xaxis: {
-                        categories: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-                        title: {
-                            text: 'Month',
-                        }
-                    },
-                    yaxis: {
-                        title: {
-                            text: 'Storage Used (GB)',
-                        },
-                        min: 0,
-                        max: totalSpaceGB > 0 ? Math.ceil(totalSpaceGB) : 350, // Set max dynamically
-                        tickAmount: 7
-                    },
-                    tooltip: {
-                        x: {
-                            format: 'MMMM'
-                        },
-                    },
-                    grid: {
-                        show: true,
-                        borderColor: '#e0e0e0',
-                    },
-                    legend: {
-                        position: 'right',
-                        horizontalAlign: 'center',
-                        labels: {
-                            colors: '#4154f1'
+      <!-- Line Chart -->
+      <div id="storageChart"></div>
+
+      <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            fetch('storage_stats.php')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load storage statistics.');
+                    }
+                    return response.json();
+                })
+                .then(stats => {
+                    if (!stats.history) {
+                        document.querySelector("#storageChart").innerHTML = '<p class="text-warning">No historical data available.</p>';
+                        return;
+                    }
+
+                    const history = stats.history;
+                    const latestYear = Math.max(...Object.keys(history).map(Number)); // Get latest year
+                    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                    const historicalData = months.map(month => history[latestYear][month] || 0); // Fill missing months with 0
+
+                    new ApexCharts(document.querySelector("#storageChart"), {
+                        series: [{
+                            name: `Storage Used (GB) - ${latestYear}`,
+                            data: historicalData
+                        }],
+                        chart: {
+                            height: 350,
+                            type: 'area',
+                            toolbar: { show: false }
                         },
                         markers: {
-                            fillColors: ['#4154f1']
+                            size: 5,
+                            colors: ['#4154f1'],
+                            strokeColors: '#ffffff',
+                            strokeWidth: 2,
+                            hover: { size: 7 }
+                        },
+                        colors: ['#4154f1'],
+                        fill: { type: "solid", opacity: 0.2 },
+                        stroke: { curve: 'smooth', width: 3 },
+                        xaxis: {
+                            categories: months,
+                            title: { text: 'Month' }
+                        },
+                        yaxis: {
+                            title: { text: 'Storage Used (GB)' }
+                        },
+                        tooltip: {
+                            x: { formatter: (val, { dataPointIndex }) => `${months[dataPointIndex]}, ${latestYear}` }
+                        },
+                        grid: {
+                            show: true,
+                            borderColor: '#e0e0e0'
+                        },
+                        legend: {
+                            position: 'right',
+                            horizontalAlign: 'center',
+                            labels: { colors: '#4154f1' },
+                            markers: { fillColors: ['#4154f1'] }
                         }
-                    }
-                }).render();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.querySelector("#storageChart").innerHTML = '<p class="text-danger">Error: Unable to load storage statistics.</p>';
-            });
-    });
-</script>
+                    }).render();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.querySelector("#storageChart").innerHTML = '<p class="text-danger">Error: Unable to load storage statistics.</p>';
+                });
+        });
+      </script>
 
-                  <!-- End Line Chart -->
-            
-                </div>
-              </div>
-            </div>
-            
-            <!-- End Reports -->
+      <!-- End Line Chart -->
+    </div>
+  </div>
+</div>
+<!-- End Reports -->
+
 
 
             
@@ -363,57 +339,49 @@ document.addEventListener("DOMContentLoaded", () => {
      * Function to fetch recent file paths for the system or a specific user.
      * Limits results to the past 7 days and avoids duplicates.
      */
-    function getRecentFilePaths($conn, $employee_id = null) {
-        // Define a time limit for recent files (e.g., 7 days)
-        $timeLimit = date('Y-m-d H:i:s', strtotime('-7 days'));
+   /**
+ * Function to fetch recent file paths for all employees.
+ * Limits results to the past 7 days and avoids duplicates.
+ */
+function getRecentFilePaths($conn) {
+    // Define a time limit for recent files (e.g., 7 days)
+    $timeLimit = date('Y-m-d H:i:s', strtotime('-7 days'));
 
-        // Define allowed file extensions
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mp3', 'wav', 'mov'];
-        $allowedExtensionsSQL = "'" . implode("', '", $allowedExtensions) . "'";
+    // Define allowed file extensions
+    $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'];
+    $allowedExtensionsSQL = "'" . implode("', '", $allowedExtensions) . "'";
 
-        // Build the query with an optional employee filter
-        $query = "
-            SELECT 
-                r.item_name, 
-                r.item_type, 
-                r.filepath, 
-                MAX(r.timestamp) AS timestamp, 
-                u.name AS user_name
-            FROM recent r
-            LEFT JOIN admin_users u ON r.employee_id = u.employee_id
-            WHERE r.timestamp >= ? 
-              AND LOWER(SUBSTRING_INDEX(r.filepath, '.', -1)) IN ($allowedExtensionsSQL)
-        ";
+    // ✅ Fetch all employees' recent media files (no employee filter)
+    $query = "
+        SELECT 
+            r.item_name, 
+            r.item_type, 
+            r.filepath, 
+            MAX(r.timestamp) AS timestamp, 
+            u.name AS user_name
+        FROM recent r
+        LEFT JOIN admin_users u ON r.employee_id = u.employee_id
+        WHERE r.timestamp >= ? 
+          AND LOWER(SUBSTRING_INDEX(r.filepath, '.', -1)) IN ($allowedExtensionsSQL)
+        GROUP BY r.filepath, r.item_name, r.item_type, u.name
+        ORDER BY MAX(r.timestamp) DESC
+        LIMIT 10
+    ";
 
-        // If employee_id is provided, limit the query to that employee
-        if ($employee_id) {
-            $query .= " AND r.employee_id = ?";
-        }
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("s", $timeLimit);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-        $query .= "
-            GROUP BY r.filepath, r.item_name, r.item_type, u.name
-            ORDER BY MAX(r.timestamp) DESC
-            LIMIT 10
-        ";
-
-        $stmt = $conn->prepare($query);
-
-        // Bind parameters
-        if ($employee_id) {
-            $stmt->bind_param("ss", $timeLimit, $employee_id);
-        } else {
-            $stmt->bind_param("s", $timeLimit);
-        }
-
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if (!$result) {
-            die("Query Failed: " . $conn->error);
-        }
-
-        return $result->fetch_all(MYSQLI_ASSOC);
+    if (!$result) {
+        die("Query Failed: " . $conn->error);
     }
+
+    return $result->fetch_all(MYSQLI_ASSOC);
+}
+
+// Fetch recent files for **all employees**
+$recentFiles = getRecentFilePaths($conn);
 
     // Check if employee_id exists in the session
     if ($employee_id) {

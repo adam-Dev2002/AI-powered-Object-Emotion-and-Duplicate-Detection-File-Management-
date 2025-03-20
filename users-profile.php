@@ -83,6 +83,7 @@ require 'head.php';?>
         </div>
     </div>
 </main>
+<script src="assets/js/main.js"></script>
 
 <?php
 require 'footer.php';

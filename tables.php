@@ -149,7 +149,6 @@ switch ($currentPage) {
                                 <th><input type="checkbox" id="selectAll"></th>
                                 <th>File/Folder Name</th>
                                 <th>Type</th>
-                                <th>Owner</th>
                                 <th>Filepath</th>
                                 <th>Location</th>
                                 <th>Actions</th>
@@ -249,7 +248,7 @@ foreach ($items as $item) {
     foreach ($items as $item) {
         $item_path = $current_directory . '/' . $item;
         $is_dir = is_dir($item_path);
-        
+
         // Create the correct URL for the file or folder
         $web_url = str_replace($base_directory, '/creative/', $item_path);
 

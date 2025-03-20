@@ -23,17 +23,20 @@ if ($employee_id) {
     $stmt->close();
 
     // Fetch the latest 5 admin activity logs for notifications
-    $notif_sql = "SELECT action, details, timestamp 
-                  FROM admin_activity_logs 
-                  WHERE admin_id = ? 
-                  ORDER BY timestamp DESC 
-                  LIMIT 5";
-    $notif_stmt = $conn->prepare($notif_sql);
-    $notif_stmt->bind_param("s", $employee_id); // Use "s" if employee_id is a string
-    $notif_stmt->execute();
-    $notif_result = $notif_stmt->get_result();
-    $notifications = $notif_result->fetch_all(MYSQLI_ASSOC);
-    $notif_stmt->close();
+    $notif_sql = "SELECT aal.action, aal.details, aal.timestamp, au.name 
+    FROM admin_activity_logs aal
+    JOIN admin_users au ON aal.admin_id = au.employee_id
+    WHERE aal.admin_id = ? 
+    ORDER BY aal.timestamp DESC 
+    LIMIT 5";
+
+$notif_stmt = $conn->prepare($notif_sql);
+$notif_stmt->bind_param("s", $employee_id);
+$notif_stmt->execute();
+$notif_result = $notif_stmt->get_result();
+$notifications = $notif_result->fetch_all(MYSQLI_ASSOC);
+$notif_stmt->close();
+
 
     // Convert timestamps to Philippine Time and adjust for 4-hour discrepancy
     date_default_timezone_set('Asia/Manila');
@@ -91,12 +94,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     <?php if (!empty($notifications)): ?>
                         <?php foreach ($notifications as $notification): ?>
                             <li class="dropdown-item">
-                                <i class="bi bi-info-circle text-primary"></i>
-                                <div>
-                                    <span><?php echo htmlspecialchars($notification['details']); ?></span>
-                                    <span class="small text-muted d-block"><?php echo htmlspecialchars($notification['timestamp']); ?></span>
-                                </div>
-                            </li>
+    <i class="bi bi-info-circle text-primary"></i>
+    <div>
+        <strong><?php echo htmlspecialchars($notification['name']); ?></strong> <!-- Show Employee Name -->
+        <br>
+        <span><?php echo htmlspecialchars($notification['details']); ?></span>
+        <span class="small text-muted d-block"><?php echo htmlspecialchars($notification['timestamp']); ?></span>
+    </div>
+</li>
+
                             <li><hr class="dropdown-divider"></li>
                         <?php endforeach; ?>
                     <?php else: ?>
@@ -110,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
           <!-- Profile -->
           <li class="nav-item dropdown pe-3">
                 <a class="nav-link nav-profile d-flex align-items-center pe-0" href="#" data-bs-toggle="dropdown">
-                    <img src="https://studentlogs.foundationu.com/Photo/<?php echo htmlspecialchars($user['employee_id'] ?? 'default'); ?>.JPG" 
+                    <img src="https://studentlogs.foundationu.com/Photo/<?php echo htmlspecialchars($user['employee_id'] ?? 'default'); ?>.JPG"
                          alt="Profile" class="rounded-circle" width="40" height="40"
                          onerror="this.onerror=null; this.src='assets/img/default-profile.png';">
                     <span class="d-none d-md-block dropdown-toggle ps-2"><?php echo htmlspecialchars($user['name'] ?? 'Admin'); ?></span>

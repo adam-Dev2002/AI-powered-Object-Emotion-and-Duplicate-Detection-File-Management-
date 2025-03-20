@@ -159,20 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['file'])) {
     $fileCount = count($_FILES['file']['name']);
     $description = isset($_POST['description']) ? $_POST['description'] : NULL;
     $tag = isset($_POST['tag']) ? trim($_POST['tag']) : NULL;
-
-    // Automatically get the album_id based on the current directory
-    $currentDirName = basename($current_directory);
-    $albumQuery = $conn->prepare("SELECT id FROM albums WHERE name = ?");
-    $albumQuery->bind_param("s", $currentDirName);
-    $albumQuery->execute();
-    $albumQuery->store_result();
-    if ($albumQuery->num_rows > 0) {
-        $albumQuery->bind_result($album_id);
-        $albumQuery->fetch();
-    } else {
-        $album_id = NULL; // No matching album found
-    }
-    $albumQuery->close();
+    $album_id = isset($_POST['albumId']) && !empty($_POST['albumId']) ? intval($_POST['albumId']) : NULL;
 
     // Validate the tag to ensure it contains only one word (no commas or spaces)
     if ($tag && preg_match('/[,\s]/', $tag)) {
@@ -202,25 +189,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['file'])) {
                     $type = 'video';
                 }
 
-                $tag_id = NULL;
-                if (!empty($tag)) {
-                    // Insert tag logic here (as previously described)
-                }
+                if (!empty($type)) {
+                    $tag_id = NULL;
+                    if (!empty($tag)) {
+                        $checkTagStmt = $conn->prepare("SELECT tag_id FROM tag WHERE tag = ? AND type = ?");
+                        if ($checkTagStmt) {
+                            $checkTagStmt->bind_param("ss", $tag, $type);
+                            $checkTagStmt->execute();
+                            $checkTagStmt->store_result();
 
-                // Insert file information into the correct table based on album_id
-                if ($album_id !== NULL) {
-                    $stmt = $conn->prepare("INSERT INTO album_files (filename, filepath, filetype, size, dateupload, description, tag_id, album_id) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)");
-                    $stmt->bind_param("sssissi", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id, $album_id);
+                            if ($checkTagStmt->num_rows > 0) {
+                                $checkTagStmt->bind_result($tag_id);
+                                $checkTagStmt->fetch();
+                            } else {
+                                $insertTagStmt = $conn->prepare("INSERT INTO tag (tag, type, filepath) VALUES (?, ?, ?)");
+                                if ($insertTagStmt) {
+                                    $insertTagStmt->bind_param("sss", $tag, $type, $filePath);
+                                    $insertTagStmt->execute();
+                                    $tag_id = $insertTagStmt->insert_id;
+                                    $insertTagStmt->close();
+                                }
+                            }
+                            $checkTagStmt->close();
+                        }
+                    }
+
+                    if ($album_id !== NULL) {
+                        $stmt = $conn->prepare("INSERT INTO album_files (filename, filepath, filetype, size, dateupload, description, tag_id, album_id) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)");
+                        $stmt->bind_param("sssissi", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id, $album_id);
+                    } else {
+                        $stmt = $conn->prepare("INSERT INTO files (filename, filepath, filetype, size, dateupload, description, tag_id) VALUES (?, ?, ?, ?, NOW(), ?, ?)");
+                        $stmt->bind_param("sssiss", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id);
+                    }
+
+                    if (!$stmt->execute()) {
+                        $response['status'] = 'error';
+                        $response['message'] .= " Failed to upload $fileName to the database.";
+                    }
+                    $stmt->close();
                 } else {
-                    $stmt = $conn->prepare("INSERT INTO files (filename, filepath, filetype, size, dateupload, description, tag_id) VALUES (?, ?, ?, ?, NOW(), ?, ?)");
-                    $stmt->bind_param("sssiss", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id);
-                }
-
-                if (!$stmt->execute()) {
                     $response['status'] = 'error';
-                    $response['message'] .= " Failed to upload $fileName to the database.";
+                    $response['message'] .= " Unsupported file type for $fileName.";
                 }
-                $stmt->close();
             } else {
                 $response['status'] = 'error';
                 $response['message'] .= " Failed to move $fileName to the directory.";
@@ -677,6 +687,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
     </style>
 
     <!-- Bootstrap CSS (optional, if you're using Bootstrap) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -1008,49 +1019,102 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
     </div>
 
 
-   <!-- Modal for Uploading File with Progress Bar and Cancel Button -->
-<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="uploadModalLabel"><i class="fas fa-upload me-2"></i>Upload Files</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="uploadForm" method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="fileToUpload" class="form-label">Select Files</label>
-                        <input type="file" class="form-control" id="fileToUpload" name="file[]" multiple required>
-                        <small id="fileError" class="form-text text-danger d-none">Please select at least one file to upload.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="tag" class="form-label"><i class="fas fa-tags me-2"></i>Tag</label>
-                        <input type="text" class="form-control" id="tag" name="tag" placeholder="Enter a single tag (no commas or spaces)">
-                        <small id="tagError" class="form-text text-danger d-none">Tag is required and must not contain spaces or commas.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label"><i class="fas fa-edit me-2"></i>Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Enter description for the files"></textarea>
-                    </div>
+    <!-- Modal for Uploading File with Progress Bar and Cancel Button -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">
+                        <i class="fas fa-upload me-2"></i> Upload Files
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="uploadForm" method="POST" enctype="multipart/form-data">
+                        <!-- File Input Styled Like Select Album with Ellipsis -->
+                        <div class="mb-3">
+                            <label for="fileToUpload" class="form-label">Select Files</label>
+
+                            <!-- Hidden File Input -->
+                            <input type="file" class="form-control d-none" id="fileToUpload" name="file[]" multiple required>
+
+                            <!-- Styled clickable div with ellipsis -->
+                            <div id="fileDisplay"
+                                 class="form-control d-flex align-items-center"
+                                 style="cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                 onclick="document.getElementById('fileToUpload').click()">
+                                <i class="fas fa-folder me-2"></i> Click here or choose files to select multiple files
+                            </div>
+
+                            <small id="fileError" class="form-text text-danger d-none">Please select at least one file to upload.</small>
+                        </div>
+
+
+
+                        <!-- Tag Input with Hover Dropdown -->
+                        <div class="mb-3 position-relative">
+                            <label for="tag" class="form-label"><i class="fas fa-tags me-2"></i> Tag</label>
+                            <input type="text" class="form-control" id="tag" name="tag" placeholder="Enter a single tag (no commas or spaces)">
+                            <small id="tagError" class="form-text text-danger d-none">Tag is required and must not contain spaces or commas.</small>
+                            <div id="tagDropdown" class="dropdown-menu p-2" style="display: none; max-height: 200px; overflow-y: auto;">
+                                <!-- Tags will be dynamically inserted here -->
+                            </div>
+                        </div>
+
+                        <!-- Description Input
+                        <div class="mb-3">
+                            <label for="description" class="form-label"><i class="fas fa-edit me-2"></i> Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Enter description for the files"></textarea>
+                        </div> -->
+
+                        <?php if(strpos($current_directory, '/Featured') !== false) { ?>
+    <!-- Album Selection Dropdown with Icon -->
+    <div class="mb-3">
+        <label for="albumId" class="form-label"><i class="fas fa-images me-2"></i> Select Album</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-folder"></i></span>
+            <select class="form-control" id="albumId" name="albumId">
+                <option value="">Select Album</option>
+                <?php
+                // Query to fetch all albums
+                $albumQuery = "SELECT id, name FROM albums ORDER BY name ASC";
+                $albumResult = $conn->query($albumQuery);
+                if ($albumResult->num_rows > 0) {
+                    while ($album = $albumResult->fetch_assoc()) {
+                        echo '<option value="' . htmlspecialchars($album['id']) . '">' . htmlspecialchars($album['name']) . '</option>';
+                    }
+                } else {
+                    echo '<option value="">No albums available</option>';
+                }
+                ?>
+            </select>
+        </div>
+    </div>
+<?php } ?>
+
+
+                        <button type="button"
+                                class="btn w-100"
+                                style="background-color: #dc3545; color: white; border: none;"
+                                onclick="startUpload()"
+                                data-bs-dismiss="modal">
+                            <i class="fas fa-cloud-upload-alt me-2"></i> Upload Files
+                        </button>
+
+                    </form>
 
                     <!-- Progress bar and Cancel button -->
-                    <div id="progressContainer" style="display: none;">
-                        <progress id="uploadProgress" value="0" max="100" class="w-100"></progress>
-                        <div id="progressPercentage" class="text-center mt-1">0%</div>
-                        <button id="cancelUploadButton" type="button" class="btn btn-danger w-100 mt-2" onclick="cancelUpload()">
-                            <i class="fas fa-times-circle me-2"></i>Cancel Upload
-                        </button>
+                    <div id="progressContainer" style="display: none; margin-top: 20px;">
+                        <progress id="uploadProgress" value="0" max="100" style="width: 100%;"></progress>
+<!--                        <div id="progressPercentage" class="text-center mt-1">0%</div>-->
+<!--                        <button id="cancelUploadButton" class="btn mt-2 w-100" onclick="cancelUpload()">-->
+<!--                            <i class="fas fa-times me-2"></i> Cancel Upload-->
+<!--                        </button>-->
                     </div>
-
-                    <button type="button" class="btn btn-primary w-100 mt-3" onclick="startUpload()" data-bs-dismiss="modal">
-                        <i class="fas fa-cloud-upload-alt me-2"></i>Upload Files
-                    </button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
-
 
 
     <!-- Modal for Create Album with AJAX setup -->

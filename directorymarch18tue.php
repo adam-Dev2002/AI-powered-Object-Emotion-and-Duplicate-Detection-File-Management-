@@ -159,20 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['file'])) {
     $fileCount = count($_FILES['file']['name']);
     $description = isset($_POST['description']) ? $_POST['description'] : NULL;
     $tag = isset($_POST['tag']) ? trim($_POST['tag']) : NULL;
-
-    // Automatically get the album_id based on the current directory
-    $currentDirName = basename($current_directory);
-    $albumQuery = $conn->prepare("SELECT id FROM albums WHERE name = ?");
-    $albumQuery->bind_param("s", $currentDirName);
-    $albumQuery->execute();
-    $albumQuery->store_result();
-    if ($albumQuery->num_rows > 0) {
-        $albumQuery->bind_result($album_id);
-        $albumQuery->fetch();
-    } else {
-        $album_id = NULL; // No matching album found
-    }
-    $albumQuery->close();
+    $album_id = isset($_POST['albumId']) && !empty($_POST['albumId']) ? intval($_POST['albumId']) : NULL;
 
     // Validate the tag to ensure it contains only one word (no commas or spaces)
     if ($tag && preg_match('/[,\s]/', $tag)) {
@@ -202,25 +189,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['file'])) {
                     $type = 'video';
                 }
 
-                $tag_id = NULL;
-                if (!empty($tag)) {
-                    // Insert tag logic here (as previously described)
-                }
+                if (!empty($type)) {
+                    $tag_id = NULL;
+                    if (!empty($tag)) {
+                        $checkTagStmt = $conn->prepare("SELECT tag_id FROM tag WHERE tag = ? AND type = ?");
+                        if ($checkTagStmt) {
+                            $checkTagStmt->bind_param("ss", $tag, $type);
+                            $checkTagStmt->execute();
+                            $checkTagStmt->store_result();
 
-                // Insert file information into the correct table based on album_id
-                if ($album_id !== NULL) {
-                    $stmt = $conn->prepare("INSERT INTO album_files (filename, filepath, filetype, size, dateupload, description, tag_id, album_id) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)");
-                    $stmt->bind_param("sssissi", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id, $album_id);
+                            if ($checkTagStmt->num_rows > 0) {
+                                $checkTagStmt->bind_result($tag_id);
+                                $checkTagStmt->fetch();
+                            } else {
+                                $insertTagStmt = $conn->prepare("INSERT INTO tag (tag, type, filepath) VALUES (?, ?, ?)");
+                                if ($insertTagStmt) {
+                                    $insertTagStmt->bind_param("sss", $tag, $type, $filePath);
+                                    $insertTagStmt->execute();
+                                    $tag_id = $insertTagStmt->insert_id;
+                                    $insertTagStmt->close();
+                                }
+                            }
+                            $checkTagStmt->close();
+                        }
+                    }
+
+                    if ($album_id !== NULL) {
+                        $stmt = $conn->prepare("INSERT INTO album_files (filename, filepath, filetype, size, dateupload, description, tag_id, album_id) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)");
+                        $stmt->bind_param("sssissi", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id, $album_id);
+                    } else {
+                        $stmt = $conn->prepare("INSERT INTO files (filename, filepath, filetype, size, dateupload, description, tag_id) VALUES (?, ?, ?, ?, NOW(), ?, ?)");
+                        $stmt->bind_param("sssiss", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id);
+                    }
+
+                    if (!$stmt->execute()) {
+                        $response['status'] = 'error';
+                        $response['message'] .= " Failed to upload $fileName to the database.";
+                    }
+                    $stmt->close();
                 } else {
-                    $stmt = $conn->prepare("INSERT INTO files (filename, filepath, filetype, size, dateupload, description, tag_id) VALUES (?, ?, ?, ?, NOW(), ?, ?)");
-                    $stmt->bind_param("sssiss", $fileName, $filePath, $fileType, $fileSize, $description, $tag_id);
-                }
-
-                if (!$stmt->execute()) {
                     $response['status'] = 'error';
-                    $response['message'] .= " Failed to upload $fileName to the database.";
+                    $response['message'] .= " Unsupported file type for $fileName.";
                 }
-                $stmt->close();
             } else {
                 $response['status'] = 'error';
                 $response['message'] .= " Failed to move $fileName to the directory.";
@@ -255,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
             if (mkdir($folderPath, 0777, true)) {
                 // Check if the folder is being created inside the 'Featured' directory
                 if (strpos($current_directory, '/Featured') !== false) {
-                    // Insert folder details into the database for 'Featured'
+                    // Insert folder details into the database
                     $stmt = $conn->prepare("INSERT INTO albums(name, description) VALUES (?, ?)");
                     $stmt->bind_param("ss", $folderName, $description);
 
@@ -266,16 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
                     }
                     $stmt->close();
                 } else {
-                    // Insert folder details into the database for 'addfolder'
-                    $stmt = $conn->prepare("INSERT INTO addfolder(name, description) VALUES (?, ?)");
-                    $stmt->bind_param("ss", $folderName, $description);
-
-                    if ($stmt->execute()) {
-                        $_SESSION['alert'] = "Folder created outside 'Featured' directory and added to 'addfolder' table successfully.";
-                    } else {
-                        $_SESSION['alert'] = "Error adding folder to 'addfolder' table: " . $stmt->error;
-                    }
-                    $stmt->close();
+                    $_SESSION['alert'] = "Folder created, but not in 'Featured' directory; no database entry added.";
                 }
             } else {
                 $_SESSION['alert'] = "Failed to create folder in the file system.";
@@ -287,7 +288,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
         $_SESSION['alert'] = "Folder name cannot be empty.";
     }
 }
-
 
 
 ?>
@@ -677,6 +677,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
     </style>
 
     <!-- Bootstrap CSS (optional, if you're using Bootstrap) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -1008,49 +1009,90 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
     </div>
 
 
-   <!-- Modal for Uploading File with Progress Bar and Cancel Button -->
-<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="uploadModalLabel"><i class="fas fa-upload me-2"></i>Upload Files</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="uploadForm" method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="fileToUpload" class="form-label">Select Files</label>
-                        <input type="file" class="form-control" id="fileToUpload" name="file[]" multiple required>
-                        <small id="fileError" class="form-text text-danger d-none">Please select at least one file to upload.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="tag" class="form-label"><i class="fas fa-tags me-2"></i>Tag</label>
-                        <input type="text" class="form-control" id="tag" name="tag" placeholder="Enter a single tag (no commas or spaces)">
-                        <small id="tagError" class="form-text text-danger d-none">Tag is required and must not contain spaces or commas.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label"><i class="fas fa-edit me-2"></i>Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Enter description for the files"></textarea>
-                    </div>
+    <!-- Modal for Uploading File with Progress Bar and Cancel Button -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel">
+                        <i class="fas fa-upload me-2"></i> Upload Files
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="uploadForm" method="POST" enctype="multipart/form-data">
+
+                        <!-- File Input -->
+                        <div class="mb-3">
+                            <label for="fileToUpload" class="form-label">Select Files</label>
+                            <input type="file" class="form-control" id="fileToUpload" name="file[]" multiple required style="display: none;">
+                            <div id="fileDisplay" class="form-control" onclick="document.getElementById('fileToUpload').click()">
+                                Click here or choose files to select multiple files
+                            </div>
+                            <small id="fileError" class="form-text text-danger" style="display: none;">Please select at least one file to upload.</small>
+                        </div>
+
+
+
+                        <!-- Tag Input with Hover Dropdown -->
+                        <div class="mb-3 position-relative">
+                            <label for="tag" class="form-label"><i class="fas fa-tags me-2"></i> Tag</label>
+                            <input type="text" class="form-control" id="tag" name="tag" placeholder="Enter a single tag (no commas or spaces)">
+                            <small id="tagError" class="form-text text-danger d-none">Tag is required and must not contain spaces or commas.</small>
+                            <div id="tagDropdown" class="dropdown-menu p-2" style="display: none; max-height: 200px; overflow-y: auto;">
+                                <!-- Tags will be dynamically inserted here -->
+                            </div>
+                        </div>
+
+                        <!-- Description Input
+                        <div class="mb-3">
+                            <label for="description" class="form-label"><i class="fas fa-edit me-2"></i> Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Enter description for the files"></textarea>
+                        </div> -->
+
+                        <!-- Album Selection Dropdown with Icon -->
+                        <div class="mb-3">
+                            <label for="albumId" class="form-label"><i class="fas fa-images me-2"></i> Select Album</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-folder"></i></span>
+                                <select class="form-control" id="albumId" name="albumId">
+                                    <option value="">Select Album</option>
+                                    <?php
+                                    // Query to fetch all albums
+                                    $albumQuery = "SELECT id, name FROM albums ORDER BY name ASC";
+                                    $albumResult = $conn->query($albumQuery);
+
+                                    if ($albumResult->num_rows > 0) {
+                                        while ($album = $albumResult->fetch_assoc()) {
+                                            echo '<option value="' . htmlspecialchars($album['id']) . '">' . htmlspecialchars($album['name']) . '</option>';
+                                        }
+                                    } else {
+                                        echo '<option value="">No albums available</option>';
+                                    }
+                                    ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Upload Button -->
+                        <button type="button" class="btn w-100" style="background-color: #dc3545; color: white; border: none;" onclick="startUpload()">
+                            <i class="fas fa-cloud-upload-alt me-2"></i> Upload Files
+                        </button>
+
+                    </form>
 
                     <!-- Progress bar and Cancel button -->
-                    <div id="progressContainer" style="display: none;">
-                        <progress id="uploadProgress" value="0" max="100" class="w-100"></progress>
+                    <div id="progressContainer" style="display: none; margin-top: 20px;">
+                        <progress id="uploadProgress" value="0" max="100" style="width: 100%;"></progress>
                         <div id="progressPercentage" class="text-center mt-1">0%</div>
-                        <button id="cancelUploadButton" type="button" class="btn btn-danger w-100 mt-2" onclick="cancelUpload()">
-                            <i class="fas fa-times-circle me-2"></i>Cancel Upload
+                        <button id="cancelUploadButton" class="btn mt-2 w-100" onclick="cancelUpload()">
+                            <i class="fas fa-times me-2"></i> Cancel Upload
                         </button>
                     </div>
-
-                    <button type="button" class="btn btn-primary w-100 mt-3" onclick="startUpload()" data-bs-dismiss="modal">
-                        <i class="fas fa-cloud-upload-alt me-2"></i>Upload Files
-                    </button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
-
 
 
     <!-- Modal for Create Album with AJAX setup -->
@@ -1182,72 +1224,69 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['folderName'])) {
 
         let currentUpload = null; // Variable to hold the current AJAX request
 
-        document.addEventListener('DOMContentLoaded', function() {
-    // Attach event listener to modal's OK button once the page is fully loaded
-    const successModalOkButton = document.getElementById('successModalOkButton');
-    successModalOkButton.addEventListener('click', function() {
-        const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-        successModal.hide(); // Manually hide the modal
-        window.location.reload(); // Refresh page to show uploaded files after hiding the modal
-    });
-});
+        // Start the upload
+        function startUpload() {
+            const formData = new FormData(document.getElementById("uploadForm"));
+            const xhr = new XMLHttpRequest();
 
-// Start the upload
-function startUpload() {
-    const formData = new FormData(document.getElementById("uploadForm"));
-    const xhr = new XMLHttpRequest();
+            xhr.open("POST", window.location.href, true); // Submit to the same PHP file
 
-    xhr.open("POST", window.location.href, true); // Submit to the same PHP file
+            // Display progress bar and reset to 0%
+            document.getElementById("progressContainer").style.display = "block";
+            document.getElementById("uploadProgress").value = 0;
 
-    // Display progress bar and reset to 0%
-    document.getElementById("progressContainer").style.display = "block";
-    document.getElementById("uploadProgress").value = 0;
+            // Update progress bar
+            xhr.upload.addEventListener("progress", (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = Math.round((event.loaded / event.total) * 100);
+                    document.getElementById("uploadProgress").value = percentComplete;
+                }
+            });
 
-    // Update progress bar
-    xhr.upload.addEventListener("progress", (event) => {
-        if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            document.getElementById("uploadProgress").value = percentComplete;
+            // On successful upload
+            xhr.addEventListener("load", () => {
+                if (xhr.status === 200) {
+                    document.getElementById('successModalBody').textContent = "File uploaded successfully";
+                    let successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                    successModal.show();
+                    document.getElementById("progressContainer").style.display = "none";
+
+                    // Reload page when the user clicks "OK" in the success modal
+                    document.getElementById('successModal').querySelector('.btn-primary').addEventListener('click', function() {
+                        window.location.reload();
+                    });
+                } else {
+                    document.getElementById('errorModalBody').textContent = "Failed to upload file";
+                    new bootstrap.Modal(document.getElementById('errorModal')).show();
+                }
+            });
+
+            // Handle cancellation
+            xhr.addEventListener("abort", () => {
+                document.getElementById('errorModalBody').textContent = "Upload canceled";
+                new bootstrap.Modal(document.getElementById('errorModal')).show();
+                document.getElementById("progressContainer").style.display = "none";
+            });
+
+            // Track the current upload
+            currentUpload = xhr;
+            xhr.send(formData);
         }
-    });
 
-    // On successful upload
-    xhr.addEventListener("load", () => {
-        if (xhr.status === 200) {
-            // Display success modal
-            document.getElementById('successModalBody').textContent = "File uploaded successfully";
-            const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-            successModal.show();
-            document.getElementById("progressContainer").style.display = "none";
-        } else {
-            // Display error modal
-            document.getElementById('errorModalBody').textContent = "Failed to upload file";
-            const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-            errorModal.show();
+        // Cancel the upload
+        function cancelUpload() {
+            if (currentUpload) {
+                currentUpload.abort();
+                currentUpload = null; // Reset the upload reference
+            }
         }
-    });
 
-    // Handle cancellation
-    xhr.addEventListener("abort", () => {
-        document.getElementById('errorModalBody').textContent = "Upload canceled";
-        const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-        errorModal.show();
-        document.getElementById("progressContainer").style.display = "none";
-    });
-
-    // Track the current upload
-    currentUpload = xhr;
-    xhr.send(formData);
-}
-
-// Display selected files
-document.getElementById('fileToUpload').addEventListener('change', function() {
-    const fileList = this.files;
-    const fileDisplay = document.getElementById('fileDisplay');
-    fileDisplay.innerHTML = fileList.length > 0 ? Array.from(fileList).map(file => file.name).join('<br>') : "Click here or choose files to select multiple files";
-});
-
-
+        // Display selected files
+        document.getElementById('fileToUpload').addEventListener('change', function() {
+            const fileList = this.files;
+            const fileDisplay = document.getElementById('fileDisplay');
+            fileDisplay.innerHTML = fileList.length > 0 ? Array.from(fileList).map(file => file.name).join('<br>') : "Click here or choose files to select multiple files";
+        });
 
     </script>
 
@@ -1296,98 +1335,29 @@ document.getElementById('fileToUpload').addEventListener('change', function() {
             <!-- Move to Trash -->
             <button type="button" class="btn btn-warning" id="moveToTrashBtn">Move to Trash</button>
 
-
-
-<!-- Add Tag Button -->
-<button type="button" class="btn btn-primary" id="addTagBtn">Add Tag</button>
-
-<!-- Add Tag Modal -->
-<div class="modal fade" id="addTagModal" tabindex="-1" aria-labelledby="addTagModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="addTagModalLabel">Add a New Tag</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <input type="text" id="tagInputModal" class="form-control" placeholder="Enter tag">
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" id="confirmTagBtn">Confirm</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-
+            <!-- Add Tag -->
+            <input type="text" id="tagInput" placeholder="Add tag to file/folder" style="display: none; margin-right: 10px;">
+            <button type="button" class="btn btn-primary" id="addTagBtn" style="display: none;">Add Tag</button>
 
             <!-- Move To Button -->
-<button type="button" class="btn btn-success" id="moveToBtn" data-bs-toggle="modal" data-bs-target="#albumModal">Feature Image</button>
+            <button type="button" class="btn btn-success" id="moveToBtn">Featured:</button>
 
-<!-- Album Modal -->
-<div class="modal fade" id="albumModal" tabindex="-1" aria-labelledby="albumModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="albumModalLabel">Select Album</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <select class="form-select" id="albumSelect">
-                    <option value="" disabled selected>Select Album</option>
+            <!-- Album Dropdown -->
+
+            <select class="form-select" id="albumSelect" style="display: inline-block; width: auto; margin-right: 10px;">
+                <option value="" disabled selected>Select Album</option>
+            </select>
+
+            <?php if(strpos($current_directory, '/Featured') !== false) { ?>
+                <!-- Dropdown to Select Downloadable Status -->
+                <select class="form-select" id="downloadableStatus" style="width: auto; display: inline-block; margin-right: 10px;">
+                    <option value="0" selected>View</option>
+                    <option value="1">Downloadable</option>
                 </select>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="confirmMoveBtn">Move Files</button>
-            </div>
-        </div>
-    </div>
-</div>
 
-
-
-
-
-
-
-
-<?php if(strpos($current_directory, '/Featured') !== false): ?>
-    <!-- Update Button -->
-    <button type="button" class="btn btn-primary" id="updateDownloadableBtn" data-bs-toggle="modal" data-bs-target="#downloadableStatusModal">Update</button>
-
-
-    <!-- Same modal, but with new "value" strings -->
-    <div class="modal fade" id="downloadableStatusModal" tabindex="-1" aria-labelledby="downloadableStatusModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="downloadableStatusModalLabel">Update File Status</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <select class="form-select" id="downloadableStatus" style="width: auto; margin-bottom: 20px;">
-                        <option value="restrict">Restrict</option>
-                        <option value="downloadable">Downloadable</option>
-                        <option value="view">View</option>
-                        <!-- NEW: Hide option -->
-                        <option value="hide">Hide</option>
-                    </select>
-                    Are you sure you want to update the status of selected files?
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="confirmDownloadableUpdateBtn">Confirm</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<?php endif; ?>
-
+                <!-- Update Button -->
+                <button type="button" class="btn btn-primary" id="updateDownloadableBtn">Update</button>
+            <?php } ?>
 
 
 
@@ -1420,22 +1390,21 @@ document.getElementById('fileToUpload').addEventListener('change', function() {
         </div>
 
 
-        <!-- Success Modal -->
-<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Success</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="successModalBody"></div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-danger" id="successModalOkButton">OK</button>
+        <!-- ✅ Success Modal -->
+        <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Success</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="successModalBody"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
-
 
         <!-- ✅ Error Modal (Fixed X Button) -->
         <div class="modal fade show" id="errorModal" tabindex="-1" aria-hidden="true">
@@ -1479,70 +1448,81 @@ document.getElementById('fileToUpload').addEventListener('change', function() {
         <!-- SCRIPT FOR BULK TOGGLE DOWNLOADABLE STATUS -->
         <script>
             document.addEventListener("DOMContentLoaded", function() {
-                const confirmDownloadableUpdateBtn = document.getElementById('confirmDownloadableUpdateBtn');
-                const downloadableStatusModal      = new bootstrap.Modal(document.getElementById('downloadableStatusModal'));
-                const downloadableStatusSelect     = document.getElementById('downloadableStatus');
-                const rowCheckboxes               = document.querySelectorAll('.rowCheckbox');
-                const successModal                = new bootstrap.Modal(document.getElementById('successModal'));
-                const errorModal                  = new bootstrap.Modal(document.getElementById('errorModal'));
+                const updateDownloadableBtn = document.querySelector('#updateDownloadableBtn');
+                const downloadableStatus = document.querySelector('#downloadableStatus');
+                const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+                const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+                const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+                const confirmationModalBody = document.getElementById('confirmationModalBody');
+                const confirmActionBtn = document.getElementById('confirmActionBtn');
 
-                function anySelected() {
-                    return Array.from(rowCheckboxes).some(cb => cb.checked);
+                function checkSelection() {
+                    return Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
                 }
 
-                confirmDownloadableUpdateBtn.addEventListener('click', async function() {
-                    downloadableStatusModal.hide();
-
-                    if (!anySelected()) {
+                // ✅ Update Button Click Event
+                updateDownloadableBtn.addEventListener('click', function () {
+                    if (!checkSelection()) {
                         document.getElementById('errorModalBody').textContent = 'No files selected.';
                         errorModal.show();
                         return;
                     }
 
-                    // Now can be "restrict", "downloadable", "view", OR "hide"
-                    const chosenStatus = downloadableStatusSelect.value;
+                    const newStatus = downloadableStatus.value; // 0 = View, 1 = Downloadable
 
-                    // Gather selected files
+                    // ✅ Get selected files and filenames
                     const selectedFiles = Array.from(rowCheckboxes)
-                        .filter(cb => cb.checked)
-                        .map(cb => {
-                            const row = cb.closest('tr');
+                        .filter(checkbox => checkbox.checked)
+                        .map(checkbox => {
+                            const row = checkbox.closest('tr');
                             return {
-                                fileId:   row.getAttribute('data-file-id'), // or data-path
-                                filename: row.querySelector('.file-folder-link').textContent.trim()
+                                fileId: row.getAttribute('data-file-id'), // Ensure data-file-id is correctly set in <tr>
+                                filename: row.querySelector('.file-folder-link').textContent.trim() // Extract filename
                             };
                         });
 
-                    try {
-                        const response = await updateFileStatus(selectedFiles, chosenStatus);
+                    if (selectedFiles.length === 0) {
+                        console.error("No valid files selected.");
+                        return;
+                    }
 
-                        if (response.status === "success") {
-                            document.getElementById('successModalBody').textContent =
-                                `Updated ${selectedFiles.length} file(s) successfully.`;
-                            successModal.show();
-                            setTimeout(() => location.reload(), 1500);
-                        } else {
-                            document.getElementById('errorModalBody').textContent =
-                                response.message || 'Failed to update database.';
+                    // ✅ Show confirmation modal before updating the database
+                    confirmationModalBody.textContent = `Are you sure you want to update ${selectedFiles.length} file(s) to "${newStatus === "1" ? 'Downloadable' : 'View'}" status?`;
+                    confirmationModal.show();
+
+                    confirmActionBtn.onclick = async function () {
+                        confirmationModal.hide();
+
+                        try {
+                            const response = await updateDownloadableStatus(selectedFiles, newStatus);
+                            if (response.status === "success") {
+                                document.getElementById('successModalBody').textContent = `Updated ${selectedFiles.length} file(s) successfully.`;
+                                successModal.show();
+                                setTimeout(() => location.reload(), 1500);
+                            } else {
+                                console.error("Update failed:", response);
+                                document.getElementById('errorModalBody').textContent = 'Failed to update database.';
+                                errorModal.show();
+                            }
+                        } catch (error) {
+                            console.error('Error updating downloadable status:', error);
+                            document.getElementById('errorModalBody').textContent = 'Unexpected error.';
                             errorModal.show();
                         }
-                    } catch (err) {
-                        console.error('Error updating file status:', err);
-                        document.getElementById('errorModalBody').textContent = 'Unexpected error.';
-                        errorModal.show();
-                    }
+                    };
                 });
 
-                // POSTs to update_downloadable2.php (or your chosen endpoint)
-                async function updateFileStatus(files, status) {
+                // ✅ Function to send AJAX request to update the database
+                async function updateDownloadableStatus(files, status) {
                     return fetch('update_downloadable2.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ files, status })
+                        body: JSON.stringify({ files, downloadable: status }) // ✅ Send 0 or 1
                     })
-                        .then(res => res.json())
+                        .then(response => response.json())
                         .catch(error => {
-                            console.error('Network error:', error);
+                            console.error('Error sending request:', error);
                             return { status: 'error', message: 'Network error.' };
                         });
                 }
@@ -1561,107 +1541,129 @@ document.getElementById('fileToUpload').addEventListener('change', function() {
         <!-- SCRIPT FOR BULK ADD ALBUM -->
 
         <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const moveBtn = document.querySelector('#moveToBtn'); // This is your modal trigger button
-    const albumSelect = document.querySelector('#albumSelect');
-    const confirmMoveBtn = document.querySelector('#confirmMoveBtn'); // Button to confirm the move
-    const successModalEl = document.getElementById('successModal');
-    const errorModalEl = document.getElementById('errorModal');
-    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+            document.addEventListener("DOMContentLoaded", function() {
+                const moveBtn = document.querySelector('#moveToBtn');
+                const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+                const albumSelect = document.querySelector('#albumSelect');
+                const successModalEl = document.getElementById('successModal');
+                const errorModalEl = document.getElementById('errorModal');
+                const confirmationModalEl = document.getElementById('confirmationModal');
+                const confirmationModalBody = document.getElementById('confirmationModalBody');
+                const confirmActionBtn = document.getElementById('confirmActionBtn');
 
-    const successModal = new bootstrap.Modal(successModalEl);
-    const errorModal = new bootstrap.Modal(errorModalEl);
+                // ✅ Ensure Bootstrap Modals are initialized properly
+                const successModal = new bootstrap.Modal(successModalEl);
+                const errorModal = new bootstrap.Modal(errorModalEl);
+                const confirmationModal = new bootstrap.Modal(confirmationModalEl);
 
-    async function loadAlbums() {
-        try {
-            const response = await fetch("fetch_albums.php");
-            if (!response.ok) throw new Error('Failed to fetch albums');
-            const albums = await response.json();
+                // ✅ Close modals properly when clicking "X" or "OK"
+                document.querySelectorAll("[data-bs-dismiss='modal']").forEach(btn => {
+                    btn.addEventListener("click", function () {
+                        successModal.hide();
+                        errorModal.hide();
+                        confirmationModal.hide();
+                    });
+                });
 
-            albumSelect.innerHTML = '<option value="" disabled selected>Select Album</option>';
-            albums.forEach(album => {
-                const option = document.createElement("option");
-                option.value = album.id;
-                option.textContent = `${album.id} - ${album.name}`;
-                albumSelect.appendChild(option);
+                // ✅ Function to load albums dynamically
+                async function loadAlbums() {
+                    try {
+                        const response = await fetch("fetch_albums.php");
+                        if (!response.ok) throw new Error('Failed to fetch albums');
+                        const albums = await response.json();
+
+                        albumSelect.innerHTML = '<option value="" disabled selected>Select Album</option>';
+                        albums.forEach(album => {
+                            const option = document.createElement("option");
+                            option.value = album.id; // Store album ID as value
+                            option.textContent = `${album.id} - ${album.name}`; // Display ID and name
+                            albumSelect.appendChild(option);
+                        });
+                    } catch (error) {
+                        console.error("Error loading albums:", error);
+                        document.getElementById('errorModalBody').textContent = "Failed to load albums: " + error.message;
+                        errorModal.show();
+                    }
+                }
+
+                loadAlbums();
+
+                function checkSelection() {
+                    return Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+                }
+
+                moveBtn.addEventListener('click', function() {
+                    if (!checkSelection()) {
+                        document.getElementById('errorModalBody').textContent = 'No files selected.';
+                        errorModal.show();
+                        return;
+                    }
+
+                    const selectedAlbumId = parseInt(albumSelect.value); // Ensure it's an integer
+                    const selectedAlbumName = albumSelect.options[albumSelect.selectedIndex]?.text.split(' - ')[1] || '';
+
+                    if (!selectedAlbumId) {
+                        document.getElementById('errorModalBody').textContent = 'No album selected.';
+                        errorModal.show();
+                        return;
+                    }
+
+                    const selectedFiles = Array.from(rowCheckboxes)
+                        .filter(checkbox => checkbox.checked)
+                        .map(checkbox => {
+                            const row = checkbox.closest('tr');
+                            return {
+                                path: row.getAttribute('data-path'),
+                                name: row.querySelector('.file-folder-link').textContent.trim()
+                            };
+                        });
+
+                    // ✅ Show confirmation modal with proper dismissal
+                    confirmationModalBody.textContent = `Are you sure you want to move ${selectedFiles.length} file(s) to the album "${selectedAlbumName}"?`;
+                    confirmationModal.show();
+
+                    // ✅ Ensure only one event listener is attached to the button
+                    confirmActionBtn.onclick = async function () {
+                        confirmationModal.hide();
+
+                        try {
+                            const moveResults = await moveFiles(selectedFiles, selectedAlbumName, selectedAlbumId);
+                            const successCount = moveResults.filter(result => result.status === 'success').length;
+                            const errorCount = moveResults.length - successCount;
+
+                            document.getElementById('successModalBody').textContent = `Move complete. ${successCount} file(s) moved successfully.${errorCount > 0 ? ` ${errorCount} file(s) failed to move.` : ''}`;
+                            successModal.show();
+
+                            setTimeout(() => location.reload(), 2000);
+                        } catch (error) {
+                            console.error('Error during file move:', error);
+                            document.getElementById('errorModalBody').textContent = 'An unexpected error occurred during the move: ' + error.message;
+                            errorModal.show();
+                        }
+                    };
+                });
+
+                async function moveFiles(files, albumName, albumId) {
+                    return Promise.all(files.map(file => {
+                        return fetch('moveFile.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                filepath: file.path,
+                                filename: file.name,
+                                albumName: albumName,
+                                albumId: albumId
+                            })
+                        })
+                            .then(response => response.json())
+                            .catch(error => {
+                                console.error(`Error moving file ${file.name}:`, error);
+                                return { status: 'error', message: `Network error while moving file ${file.name}: ${error.message}` };
+                            });
+                    }));
+                }
             });
-        } catch (error) {
-            console.error("Error loading albums:", error);
-            document.getElementById('errorModalBody').textContent = "Failed to load albums: " + error.message;
-            errorModal.show();
-        }
-    }
-
-    loadAlbums();
-
-    function checkSelection() {
-        return Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
-    }
-
-    confirmMoveBtn.addEventListener('click', async function() {
-        if (!checkSelection()) {
-            document.getElementById('errorModalBody').textContent = 'No files selected.';
-            errorModal.show();
-            return;
-        }
-
-        const selectedAlbumId = parseInt(albumSelect.value);
-        const selectedAlbumName = albumSelect.options[albumSelect.selectedIndex]?.text.split(' - ')[1];
-
-        if (!selectedAlbumId) {
-            document.getElementById('errorModalBody').textContent = 'No album selected.';
-            errorModal.show();
-            return;
-        }
-
-        const selectedFiles = Array.from(rowCheckboxes)
-            .filter(checkbox => checkbox.checked)
-            .map(checkbox => {
-                const row = checkbox.closest('tr');
-                return {
-                    path: row.getAttribute('data-path'),
-                    name: row.querySelector('.file-folder-link').textContent.trim()
-                };
-            });
-
-        try {
-            const moveResults = await moveFiles(selectedFiles, selectedAlbumName, selectedAlbumId);
-            const successCount = moveResults.filter(result => result.status === 'success').length;
-            const errorCount = moveResults.length - successCount;
-
-            document.getElementById('successModalBody').textContent = `Move complete. ${successCount} file(s) moved successfully.${errorCount > 0 ? ` ${errorCount} file(s) failed to move.` : ''}`;
-            successModal.show();
-
-            setTimeout(() => location.reload(), 2000); // Optional: Reload the page after the operation
-        } catch (error) {
-            console.error('Error during file move:', error);
-            document.getElementById('errorModalBody').textContent = 'An unexpected error occurred during the move: ' + error.message;
-            errorModal.show();
-        }
-    });
-
-    async function moveFiles(files, albumName, albumId) {
-        return Promise.all(files.map(file => {
-            return fetch('moveFile.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    filepath: file.path,
-                    filename: file.name,
-                    albumName: albumName,
-                    albumId: albumId
-                })
-            })
-            .then(response => response.json())
-            .catch(error => {
-                console.error(`Error moving file ${file.name}:`, error);
-                return { status: 'error', message: `Network error while moving file ${file.name}: ${error.message}` };
-            });
-        }));
-    }
-});
-</script>
-
+        </script>
 
 
 
@@ -1671,94 +1673,99 @@ document.addEventListener("DOMContentLoaded", function() {
         <!-- SCRIPT FOR BULK DELETE-->
         <script>
             document.addEventListener("DOMContentLoaded", function() {
-    // Get references
-    const actionButtonContainer = document.querySelector('.action-button-container');
-    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
-    const deleteSelectedBtn = document.querySelector('#deleteSelectedBtn');
+                // Get references to the elements
+                const actionButtonContainer = document.querySelector('.action-button-container');
+                const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+                const deleteSelectedBtn = document.querySelector('#deleteSelectedBtn');
+                const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+                const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+                const confirmActionBtn = document.querySelector('#confirmActionBtn');
+                const modalCloseButtons = document.querySelectorAll('.modal-close-btn');
 
-    const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+                // Function to toggle the visibility of the action button
+                function toggleActionButton() {
+                    const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+                    actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+                }
 
-    const confirmActionBtn = document.querySelector('#confirmActionBtn');
-    const modalCloseButtons = document.querySelectorAll('.modal-close-btn');
+                // Add event listeners to all checkboxes
+                rowCheckboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', toggleActionButton);
+                });
 
-    // Ensure the Cancel / X in the confirmation modal always hide it
-    modalCloseButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            confirmationModal.hide();
-        });
-    });
+                // Run once to ensure the button's initial state is correct
+                toggleActionButton();
 
-    // Show/hide action-button-container if any row is checked
-    function toggleActionButton() {
-        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
-        actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
-    }
-    rowCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', toggleActionButton);
-    });
-    toggleActionButton(); // Initialize state
+                // Bulk deletion logic with modals
+                deleteSelectedBtn.addEventListener('click', async function() {
+                    const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
 
-    // Bulk deletion logic
-    deleteSelectedBtn.addEventListener('click', async function() {
-        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
-        if (selectedCheckboxes.length === 0) {
-            document.getElementById('errorModalBody').textContent = 'No files or folders selected for deletion.';
-            errorModal.show();
-            return;
-        }
+                    if (selectedCheckboxes.length === 0) {
+                        document.getElementById('errorModalBody').textContent = 'No files or folders selected for deletion.';
+                        errorModal.show();
+                        return;
+                    }
 
-        const selectedItems = selectedCheckboxes.map(checkbox => {
-            const row = checkbox.closest('tr');
-            return row.querySelector('.file-folder-link').textContent.trim();
-        });
+                    // Collect the names of all selected files/folders
+                    const selectedItems = selectedCheckboxes.map(checkbox => {
+                        const row = checkbox.closest('tr');
+                        return row.querySelector('.file-folder-link').textContent.trim();
+                    });
 
-        document.getElementById('confirmationModalTitle').textContent = 'Confirm Deletion';
-        document.getElementById('confirmationModalBody').textContent = `Are you sure you want to delete these files/folders?\n\n${selectedItems.join('\n')}`;
-        confirmActionBtn.textContent = "Delete";
+                    document.getElementById('confirmationModalBody').textContent = `Are you sure you want to delete these files/folders?\n\n${selectedItems.join('\n')}`;
+                    confirmationModal.show();
 
-        confirmActionBtn.onclick = async function() {
-            confirmationModal.hide();
-            const deletionPromises = selectedCheckboxes.map(checkbox => {
-                const row = checkbox.closest('tr');
-                const filePath = row.getAttribute('data-path');
-                const fileName = row.querySelector('.file-folder-link').textContent.trim();
-                return deleteMedia(filePath, fileName);
+                    // ✅ Ensure the modal closes properly when clicking "Cancel" or "X"
+                    modalCloseButtons.forEach(button => {
+                        button.addEventListener('click', () => {
+                            confirmationModal.hide();
+                        });
+                    });
+
+                    confirmActionBtn.onclick = async function () {
+                        confirmationModal.hide();
+
+                        const deletionPromises = selectedCheckboxes.map(checkbox => {
+                            const row = checkbox.closest('tr');
+                            const filePath = row.getAttribute('data-path');
+                            const fileName = row.querySelector('.file-folder-link').textContent.trim();
+
+                            return deleteMedia(filePath, fileName);
+                        });
+
+                        try {
+                            const results = await Promise.all(deletionPromises);
+                            const successCount = results.filter(result => result.status === 'success').length;
+                            const errorCount = results.length - successCount;
+
+                            document.getElementById('successModalBody').textContent = `Deletion complete. ${successCount} item(s) deleted successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to delete.` : ''}`;
+                            successModal.show();
+                            setTimeout(() => location.reload(), 1500);
+                        } catch (error) {
+                            console.error('Error during deletion:', error);
+                            document.getElementById('errorModalBody').textContent = 'An unexpected error occurred during deletion.';
+                            errorModal.show();
+                        }
+                    };
+                });
+
+                async function deleteMedia(filePath, fileName) {
+                    try {
+                        const response = await fetch('deleteMedia.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ filepath: filePath, fileName: fileName }),
+                        });
+                        return await response.json();
+                    } catch (error) {
+                        console.error(`Error deleting file ${fileName}:`, error);
+                        return { status: 'error', message: 'Network error during deletion.' };
+                    }
+                }
             });
-
-            try {
-                const results = await Promise.all(deletionPromises);
-                const successCount = results.filter(r => r.status === 'success').length;
-                const errorCount = results.length - successCount;
-
-                document.getElementById('successModalBody').textContent = `Deletion complete. ${successCount} item(s) deleted successfully.` + (errorCount > 0 ? ` ${errorCount} item(s) failed to delete.` : '');
-                successModal.show();
-                setTimeout(() => window.location.reload(), 1500);
-            } catch (error) {
-                console.error('Error during deletion:', error);
-                document.getElementById('errorModalBody').textContent = 'An unexpected error occurred during deletion.';
-                errorModal.show();
-            }
-        };
-        confirmationModal.show();
-    });
-
-    // Function to call server to delete
-    async function deleteMedia(filePath, fileName) {
-        try {
-            const response = await fetch('deleteMedia.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filepath: filePath, fileName: fileName })
-            });
-            return await response.json();
-        } catch (error) {
-            console.error(`Error deleting file ${fileName}:`, error);
-            return { status: 'error', message: 'Network error during deletion.' };
-        }
-    }
-});
 
 
         </script>
@@ -1771,91 +1778,83 @@ document.addEventListener("DOMContentLoaded", function() {
                 const actionButtonContainer = document.querySelector('.action-button-container');
                 const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
                 const moveToTrashBtn = document.querySelector('#moveToTrashBtn');
-
-                // Access your single shared modals
                 const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-                const successModal      = new bootstrap.Modal(document.getElementById('successModal'));
-                const errorModal        = new bootstrap.Modal(document.getElementById('errorModal'));
+                const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
 
-                // Toggle the "action button" visibility
+                // Function to control visibility of the action button based on selection
                 function toggleActionButton() {
                     const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
                     actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
                 }
+
+                // Attach change event listeners to all checkboxes to manage action button visibility
                 rowCheckboxes.forEach(checkbox => {
                     checkbox.addEventListener('change', toggleActionButton);
                 });
+
+                // Initial state check for the action button
                 toggleActionButton();
 
-                // Listen for "Move to Trash"
+                // Event listener for the move-to-trash button
                 moveToTrashBtn.addEventListener('click', async function() {
                     const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
+
                     if (selectedCheckboxes.length === 0) {
-                        document.getElementById('errorModalBody').textContent =
-                            'No files or folders selected to move to trash.';
+                        document.getElementById('errorModalBody').textContent = 'No files or folders selected to move to trash.';
                         errorModal.show();
                         return;
                     }
 
-                    // Gather selected item names
+                    // Display a list of selected items to the user for confirmation
                     const selectedItems = selectedCheckboxes.map(checkbox => {
                         const row = checkbox.closest('tr');
                         return row.querySelector('.file-folder-link').textContent.trim();
                     });
 
-                    // Make the modal title, body, and confirm button dynamic
-                    document.getElementById('confirmationModalTitle').textContent = "Move to Trash";
-                    document.getElementById('confirmationModalBody').innerHTML = `
-          Are you sure you want to move these items to trash?<br><br>
-          <strong>${selectedItems.join('<br>')}</strong>
-        `;
-                    // Also change the confirm button text if you want:
-                    document.getElementById('confirmActionBtn').textContent = "Trash Items";
-
-                    // Show the modal
+                    document.getElementById('confirmationModalBody').textContent = `The following files/folders are selected to move to trash:\n\n${selectedItems.join('\n')}`;
                     confirmationModal.show();
 
-                    // On confirm click
-                    document.getElementById('confirmActionBtn').onclick = async () => {
+                    document.querySelector('#confirmActionBtn').addEventListener('click', async () => {
                         confirmationModal.hide();
 
-                        // Move each file to trash
                         const trashPromises = selectedCheckboxes.map(checkbox => {
-                            const row      = checkbox.closest('tr');
+                            const row = checkbox.closest('tr');
                             const filePath = row.getAttribute('data-path');
                             const fileName = row.querySelector('.file-folder-link').textContent.trim();
+
                             return moveToTrash(filePath, fileName);
                         });
 
                         try {
                             const results = await Promise.all(trashPromises);
                             const successCount = results.filter(result => result.status === 'success').length;
-                            const errorCount   = results.length - successCount;
+                            const errorCount = results.length - successCount;
 
-                            document.getElementById('successModalBody').textContent =
-                                `Move to trash complete. ${successCount} item(s) moved successfully.` +
-                                (errorCount > 0 ? ` ${errorCount} item(s) failed to move.` : '');
+                            document.getElementById('successModalBody').textContent = `Move to trash complete. ${successCount} item(s) moved successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to move.` : ''}`;
                             successModal.show();
                             location.reload();
                         } catch (error) {
                             console.error('Error during move to trash:', error);
-                            document.getElementById('errorModalBody').textContent =
-                                'An unexpected error occurred while moving items to trash.';
+                            document.getElementById('errorModalBody').textContent = 'An unexpected error occurred while moving items to trash.';
                             errorModal.show();
                         }
-                    };
+                    });
                 });
 
-                // Helper function to call your server to move item to trash
+                // Function to make the server request to move a file/folder to trash
                 async function moveToTrash(filePath, fileName) {
                     try {
                         const response = await fetch('moveToTrash.php', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
                             body: JSON.stringify({ filepath: filePath, fileName: fileName })
                         });
+
                         if (!response.ok) {
-                            throw new Error((await response.json()).message || 'Server error');
+                            throw new Error((await response.json()).message || 'Server error occurred');
                         }
                         return await response.json();
                     } catch (error) {
@@ -1864,12 +1863,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
             });
-
         </script>
-
-
-
-
 
 
 
@@ -1877,102 +1871,108 @@ document.addEventListener("DOMContentLoaded", function() {
         <!-- SCRIPT ADD TAG-->
 
         <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const actionButtonContainer = document.querySelector('.action-button-container');
-    const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
-    const addTagBtn = document.querySelector('#addTagBtn');
-    const tagInputModal = document.getElementById('tagInputModal');
-    const confirmTagBtn = document.getElementById('confirmTagBtn');
-    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-    const addTagModal = new bootstrap.Modal(document.getElementById('addTagModal'));
+            document.addEventListener("DOMContentLoaded", function() {
+                // Get references to the elements
+                const actionButtonContainer = document.querySelector('.action-button-container');
+                const rowCheckboxes = document.querySelectorAll('.rowCheckbox');
+                const addTagBtn = document.querySelector('#addTagBtn');
+                const tagInput = document.querySelector('#tagInput');
+                const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+                const successModal = new bootstrap.Modal(document.getElementById('successModal'));
 
-    function toggleActionButton() {
-        const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
-        actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
-        addTagBtn.style.display = isAnyCheckboxSelected ? 'inline-block' : 'none';
-    }
+                // Function to toggle the visibility of the action button and input
+                function toggleActionButton() {
+                    const isAnyCheckboxSelected = Array.from(rowCheckboxes).some(checkbox => checkbox.checked);
+                    actionButtonContainer.style.display = isAnyCheckboxSelected ? 'block' : 'none';
+                    tagInput.style.display = isAnyCheckboxSelected ? 'inline-block' : 'none';
+                    addTagBtn.style.display = isAnyCheckboxSelected ? 'inline-block' : 'none';
+                }
 
-    rowCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', toggleActionButton);
-    });
+                // Add event listeners to all checkboxes
+                rowCheckboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', toggleActionButton);
+                });
 
-    toggleActionButton();
+                // Run once to ensure the button's initial state is correct
+                toggleActionButton();
 
-    addTagBtn.addEventListener('click', function() {
-        if (!Array.from(rowCheckboxes).some(checkbox => checkbox.checked)) {
-            console.log("No selection error triggered.");
-            document.getElementById('errorModalBody').textContent = 'No files or folders selected to add a tag.';
-            errorModal.show();
-            return;
-        }
-        tagInputModal.value = '';
-        console.log("Showing add tag modal.");
-        addTagModal.show();
-    });
+                // Add Tag button logic
+                addTagBtn.addEventListener('click', async function() {
+                    const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
+                    const tag = tagInput.value.trim();
 
-    confirmTagBtn.addEventListener('click', async function() {
-        const tag = tagInputModal.value.trim();
-        if (!tag) {
-            console.log("No tag input error triggered.");
-            document.getElementById('errorModalBody').textContent = 'Please enter a tag.';
-            errorModal.show();
-            return;
-        }
+                    if (selectedCheckboxes.length === 0) {
+                        document.getElementById('errorModalBody').textContent = 'No files or folders selected to add a tag.';
+                        errorModal.show();
+                        return;
+                    }
 
-        const selectedCheckboxes = Array.from(rowCheckboxes).filter(checkbox => checkbox.checked);
-        console.log("Confirming tag operation for selected items.");
+                    if (!tag) {
+                        document.getElementById('errorModalBody').textContent = 'Please enter a tag.';
+                        errorModal.show();
+                        return;
+                    }
 
-        const tagPromises = selectedCheckboxes.map(checkbox => {
-            const row = checkbox.closest('tr');
-            const filePath = row.getAttribute('data-path');
-            const fileName = row.querySelector('.file-folder-link').textContent.trim();
-            return addTagToItem(filePath, fileName, tag);
-        });
+                    // Collect the file paths and names of all selected files/folders
+                    const selectedItems = selectedCheckboxes.map(checkbox => {
+                        const row = checkbox.closest('tr');
+                        return {
+                            filePath: row.getAttribute('data-path'),
+                            fileName: row.querySelector('.file-folder-link').textContent.trim()
+                        };
+                    });
 
-        try {
-            const results = await Promise.all(tagPromises);
-            const successCount = results.filter(result => result.status === 'success').length;
-            console.log(`Tagging successful for ${successCount} items.`);
-            document.getElementById('successModalBody').textContent = `Tagging complete. ${successCount} item(s) tagged successfully.`;
-            successModal.show();
-            addTagModal.hide();
-        } catch (error) {
-            console.error('Error during tagging:', error);
-            document.getElementById('errorModalBody').textContent = 'An unexpected error occurred while tagging.';
-            errorModal.show();
-        }
-    });
+                    // Send the tag request for each selected item
+                    const tagPromises = selectedItems.map(item => addTagToItem(item.filePath, item.fileName, tag));
 
-    async function addTagToItem(filePath, fileName, tag) {
-        try {
-            console.log(`Sending tag request for ${fileName}.`);
-            const response = await fetch('addTag.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    filepath: filePath,
-                    fileName: fileName,
-                    tag: tag
-                }),
+                    try {
+                        // Wait for all tag requests to complete
+                        const results = await Promise.all(tagPromises);
+
+                        // Filter success and failure messages
+                        const successCount = results.filter(result => result.status === 'success').length;
+                        const errorCount = results.length - successCount;
+
+                        document.getElementById('successModalBody').textContent = `Tagging complete. ${successCount} item(s) tagged successfully.${errorCount > 0 ? ` ${errorCount} item(s) failed to tag.` : ''}`;
+                        successModal.show();
+
+                        // Optionally clear the tag input and reload the page
+                        tagInput.value = '';
+                        location.reload();
+                    } catch (error) {
+                        console.error('Error during tagging:', error);
+                        document.getElementById('errorModalBody').textContent = 'An unexpected error occurred while tagging.';
+                        errorModal.show();
+                    }
+                });
+
+                // Function to handle the add tag request
+                async function addTagToItem(filePath, fileName, tag, type) {
+                    try {
+                        const response = await fetch('addTag.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                filepath: filePath,
+                                fileName: fileName,
+                                tag: tag,
+                                type: type  // This needs to be determined and added
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error((await response.json()).message || 'Server error during tagging');
+                        }
+                        return await response.json();
+                    } catch (error) {
+                        console.error(`Error adding tag to ${fileName}:`, error);
+                        return { status: 'error', message: 'Network error during tagging.' };
+                    }
+                }
             });
-
-            if (!response.ok) {
-                throw new Error((await response.json()).message || 'Server error during tagging');
-            }
-            return await response.json();
-        } catch (error) {
-            console.error(`Error adding tag to ${fileName}:`, error);
-            return { status: 'error', message: 'Network error during tagging.' };
-        }
-    }
-});
-
-</script>
-
-
+        </script>
 
 
 
@@ -1984,15 +1984,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
 
         <style>
-            .dropdown-menu {
-                position: absolute !important;
-                z-index: 9999;
-            }
-            .file-table-container {
-                position: relative;
-                overflow: visible; /* Important to prevent clipping */
-            }
-
             .action-button-container {
                 margin-top: 10px;
             }
@@ -2091,56 +2082,6 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
 
-            /* The Modal (background) */
-.modal {
-  display: none; /* Hidden by default */
-  position: fixed; /* Stay in place */
-  z-index: 1; /* Sit on top */
-  left: 0;
-  top: 0;
-  width: 100%; /* Full width */
-  height: 100%; /* Full height */
-  overflow: auto; /* Enable scroll if needed */
-  background-color: rgb(0,0,0); /* Fallback color */
-  background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-}
-
-/* Modal Content */
-.modal-content {
-  background-color: #fefefe;
-  margin: 15% auto; /* 15% from the top and centered */
-  padding: 20px;
-  border: 1px solid #888;
-  width: 80%; /* Could be more or less, depending on screen size */
-}
-
-/* The Close Button */
-.close {
-  color: #aaa;
-  float: right;
-  font-size: 28px;
-  font-weight: bold;
-}
-
-.close:hover,
-.close:focus {
-  color: black;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-
-.modal-backdrop {
-    z-index: 1040; /* or higher if necessary */
-}
-
-.modal {
-    z-index: 1050; /* should be higher than the backdrop */
-}
-
-
-
-
         </style>
 
 
@@ -2212,7 +2153,6 @@ document.addEventListener("DOMContentLoaded", function() {
                                        onclick="recordActivity('<?php echo addslashes($item); ?>', 'file', '<?php echo htmlspecialchars($item_path); ?>'); openModal('<?php echo htmlspecialchars($web_url); ?>', '<?php echo htmlspecialchars(pathinfo($item, PATHINFO_EXTENSION)); ?>')">
                                         <?php echo htmlspecialchars($item); ?>
                                     </a>
-
                                 <?php endif; ?>
                             </td>
                             <td><?php echo $is_dir ? 'Folder' : 'File'; ?></td>
@@ -2265,61 +2205,18 @@ document.addEventListener("DOMContentLoaded", function() {
                                     });
 
                                 </script>
-
                             <td>
-                                <!-- Actions Button inside table -->
-                                <button class="btn btn-sm btn-danger dropdown-toggle"
-                                        type="button"
-                                        id="dropdownActions-<?php echo htmlspecialchars($item); ?>"
-                                        onclick="toggleDropdown(this)">
-                                    <i class="fas fa-cogs"></i> Actions
-                                </button>
-                            </td>
-
-                            <!-- Dropdown Menu OUTSIDE of the table -->
-                            <ul class="dropdown-menu"
-                                id="floatingDropdown-<?php echo htmlspecialchars($item); ?>"
-                                style="display: none; position: absolute; z-index: 9999;">
-                                <li>
-                                    <a class="dropdown-item" href="javascript:void(0);"
-                                       onclick="renameMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')">
-                                        <i class="fas fa-i-cursor"></i> Rename
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="javascript:void(0);"
-                                       onclick="copyMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                                        <i class="fas fa-copy"></i> Duplicate
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="javascript:void(0);"
-                                       onclick="downloadMedia('<?php echo htmlspecialchars($item_path); ?>')">
-                                        <i class="fas fa-download"></i> Download
-                                    </a>
-                                </li>
-                            </ul>
-
-        </div>
-        <script>function toggleDropdown(button) {
-                const dropdown = document.getElementById('floatingDropdown-<?php echo htmlspecialchars($item); ?>');
-                const rect = button.getBoundingClientRect();
-
-                // Position the dropdown below the button
-                dropdown.style.top = (window.scrollY + rect.bottom) + 'px';
-                dropdown.style.left = (window.scrollX + rect.left) + 'px';
-                dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-            }
-
-            // Optional: Hide dropdown if clicked outside
-            document.addEventListener('click', function(e) {
-                const dropdown = document.getElementById('floatingDropdown-<?php echo htmlspecialchars($item); ?>');
-                if (!e.target.closest('button') && !e.target.closest('.dropdown-menu')) {
-                    dropdown.style.display = 'none';
-                }
-            });
-        </script>
-
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-danger dropdown-toggle" type="button" id="dropdownActions-<?php echo htmlspecialchars($item); ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-cogs"></i> Actions
+                                    </button>
+                                    <ul class="dropdown-menu" aria-labelledby="dropdownActions-<?php echo htmlspecialchars($item); ?>">
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="renameMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')"><i class="fas fa-i-cursor"></i> Rename</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="copyMedia('<?php echo htmlspecialchars($item_path); ?>')"><i class="fas fa-copy"></i> Duplicate</a></li>
+                                        <li><a class="dropdown-item" href="javascript:void(0);" onclick="downloadMedia('<?php echo htmlspecialchars($item_path); ?>')"><i class="fas fa-download"></i> Download</a></li>
+                                        <li><a class="dropdown-item text-danger" href="javascript:void(0);" onclick="deleteMedia('<?php echo htmlspecialchars($item_path); ?>', '<?php echo htmlspecialchars($item); ?>')"><i class="fas fa-trash"></i> Delete</a></li>
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -2865,23 +2762,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var currentIndex = 0;
 
     // Function to open the preview overlay and display the image or video
-    function openModal(fileUrl, fileType, originalType) {
-        // Force fileType to "mp4" if originalType is "mp4" (ignoring case)
-        if (originalType && originalType.toLowerCase() === "mp4") {
-            fileType = "mp4";
-        }
-        // If fileType is empty, try extracting from fileUrl.
-        if (!fileType || fileType.trim() === "") {
-            const parts = fileUrl.split('.');
-            if (parts.length > 1) {
-                fileType = parts.pop().split('?')[0].toLowerCase();
-            }
-        }
-        // Final fallback: if fileType is still empty, assume an image.
-        if (!fileType || fileType.trim() === "") {
-            fileType = "jpg";
-        }
-
+    function openModal(fileUrl, fileType) {
         var overlay = document.getElementById("file-preview-overlay");
         var content = document.getElementById("file-preview-content");
         content.innerHTML = ""; // Clear previous content
@@ -2889,43 +2770,22 @@ document.addEventListener("DOMContentLoaded", function() {
         // Add cache-busting query string
         const updatedFileUrl = `${fileUrl}?t=${new Date().getTime()}`;
 
-        // Create the appropriate preview element based on fileType.
+        // Create the appropriate preview element based on file type
         if (fileType.match(/(jpg|jpeg|png|gif|webp)$/i)) {
             var img = document.createElement("img");
             img.src = updatedFileUrl;
             img.className = "preview-media";
             content.appendChild(img);
-        } else if (fileType.match(/(mp4|mov|avi|mkv)$/i)) {
-            // Create a video element with a source element.
+        } else if (fileType.match(/(mp4|mp3|wav|mov|CR2|xmp)$/i)) {
             var video = document.createElement("video");
+            video.src = updatedFileUrl;
             video.className = "preview-media";
             video.controls = true;
-            var source = document.createElement("source");
-            source.src = updatedFileUrl;
-            // Force MIME type to "video/mp4" for MP4 files.
-            source.type = "video/mp4";
-            video.appendChild(source);
             content.appendChild(video);
-        } else if (fileType.match(/(mp3|wav|aac|ogg|flac|m4a|wma)$/i)) {
-            var audio = document.createElement("audio");
-            audio.className = "preview-media";
-            audio.controls = true;
-            var audioSource = document.createElement("source");
-            audioSource.src = updatedFileUrl;
-            // Default MIME type for MP3
-            audioSource.type = "audio/mpeg";
-            audio.appendChild(audioSource);
-            content.appendChild(audio);
         } else if (fileType === 'folder') {
             var text = document.createElement("p");
             text.textContent = "This is a folder. Preview is not available.";
             content.appendChild(text);
-        } else {
-            // For unsupported or unknown types, default to image preview.
-            var img = document.createElement("img");
-            img.src = updatedFileUrl;
-            img.className = "preview-media";
-            content.appendChild(img);
         }
 
         overlay.style.display = "flex"; // Show the overlay
@@ -3015,29 +2875,14 @@ document.addEventListener("DOMContentLoaded", function() {
         return filePath.split('/').pop(); // Extracts the last part of the path as the filename
     }
 
-    function renameMedia(filePath, fileName, fileType) {
-        // Ensure fileName is set
-        if (!fileName) fileName = extractFileName(filePath);
+    // Function to rename a file/folder using modal
+    function renameMedia(filePath, fileName) {
+        if (!fileName) fileName = extractFileName(filePath); // Ensure filename is extracted
 
-        // Determine the original extension: use fileType if available,
-        // otherwise extract from fileName if it contains a dot.
-        let originalExt = fileType || '';
-        if (!originalExt && fileName.includes('.')) {
-            originalExt = fileName.substring(fileName.lastIndexOf('.') + 1);
-        }
-
-        // Prefill with the file name without its extension.
-        let prefillName = fileName;
-        if (originalExt) {
-            prefillName = fileName.substring(0, fileName.lastIndexOf('.'));
-        }
-
-        // Set up the modal content with a hidden field holding the original extension.
         document.getElementById('confirmationModalTitle').textContent = "Rename File";
         document.getElementById('confirmationModalBody').innerHTML = `
-        Enter a new name for "<strong>${fileName}</strong>":<br>
-        <input type="text" class="form-control mt-2" id="newFileName" value="${prefillName}">
-        <input type="hidden" id="originalExtension" value="${originalExt}">
+        Enter a new name for "<strong>${fileName}</strong>":
+        <input type="text" class="form-control mt-2" id="newFileName" value="${fileName}">
     `;
 
         let confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
@@ -3045,29 +2890,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
         document.getElementById('confirmActionBtn').textContent = "Rename";
         document.getElementById('confirmActionBtn').onclick = function () {
-            let newName = document.getElementById('newFileName').value.trim();
-            let origExt = document.getElementById('originalExtension').value.trim();
-
+            const newName = document.getElementById('newFileName').value.trim();
             if (!newName || newName === fileName) {
                 confirmationModal.hide();
                 showErrorModal("You did not change the file name.");
                 return;
             }
 
-            // If the file is a video (fileType is "mp4"), always force the extension to be ".mp4".
-            if (fileType && fileType.toLowerCase() === "mp4") {
-                newName = newName.replace(/\.[^/.]+$/, ""); // Remove any existing extension
-                fileName = newName + ".mp4";
-            } else {
-                // For non-video files (images etc.), do not automatically add an extension.
-                fileName = newName;
-            }
-
-            // Send the new name to the server.
             fetch('rename_file.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filePath, newName: fileName, originalExt: origExt })
+                body: JSON.stringify({ filePath, newName })
             })
                 .then(response => response.json())
                 .then(data => {
@@ -3083,42 +2916,41 @@ document.addEventListener("DOMContentLoaded", function() {
         };
     }
 
-
-
-
-
-
     // Function to delete a file/folder using modal
-function deleteMedia(filePath, fileName, itemType = 'file') {
-    if (!fileName) fileName = extractFileName(filePath);
-    document.getElementById('confirmationModalTitle').textContent = "Confirm Delete";
-    document.getElementById('confirmationModalBody').innerHTML =
-        `Are you sure you want to delete "<strong>${fileName}</strong>"? This action cannot be undone.`;
-    let confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-    confirmationModal.show();
-    document.getElementById('confirmActionBtn').textContent = "Delete";
-    document.getElementById('confirmActionBtn').onclick = async function () {
-        confirmationModal.hide(); // Hide modal before proceeding
-        try {
-            const response = await fetch('deleteMediaFile.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filepath: filePath, itemType: itemType })
-            });
-            const data = await response.json();
-            if (data.status === 'success') {
-                let message = `"${fileName}" deleted successfully!`;
-                showSuccessModal(message);
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showErrorModal(`Error deleting file: ${data.message}`);
+    function deleteMedia(filePath, fileName, itemType = 'file') {
+        if (!fileName) fileName = extractFileName(filePath);
+        document.getElementById('confirmationModalTitle').textContent = "Confirm Delete";
+        document.getElementById('confirmationModalBody').innerHTML =
+            `Are you sure you want to delete "<strong>${fileName}</strong>"? This action cannot be undone.`;
+        let confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+        confirmationModal.show();
+        document.getElementById('confirmActionBtn').textContent = "Delete";
+        document.getElementById('confirmActionBtn').onclick = async function () {
+            confirmationModal.hide(); // Hide modal before proceeding
+            try {
+                const response = await fetch('deleteMediaFile.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filepath: filePath })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    // If the item is a folder and is not inside the 'Featured' directory, show "Folder Deleted"
+                    let message = `"${fileName}" deleted successfully!`;
+                    if (itemType === 'folder' && !filePath.includes('/Featured')) {
+                        message = "Folder Deleted";
+                    }
+                    showSuccessModal(message);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showErrorModal(`Error deleting file: ${data.message}`);
+                }
+            } catch (error) {
+                console.error("Error deleting file:", error);
+                showErrorModal("An error occurred while deleting the file.");
             }
-        } catch (error) {
-            console.error("Error deleting file:", error);
-            showErrorModal("An error occurred while deleting the file.");
-        }
-    };
-}
+        };
+    }
 
 
 

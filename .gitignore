@@ -1,8 +1,19 @@
-# Ignore virtual environments and other heavy directories
+# Ignore Python virtual environments
 env/
 venv/
 yolo_env/
-downloads/
-forms/
-photos/
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore log files
+*.log
+
+# Ignore dependency directories
+node_modules/
 
