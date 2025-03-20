@@ -1,528 +1,143 @@
 /Users/capstone2024-2025/.matplotlib is not a writable directory
-Matplotlib created a temporary cache directory at /tmp/matplotlib-1ji65oha because there was an issue with the default path (/Users/capstone2024-2025/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+Matplotlib created a temporary cache directory at /tmp/matplotlib-9m1mmlvv because there was an issue with the default path (/Users/capstone2024-2025/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
 Matplotlib is building the font cache; this may take a moment.
 WARNING ⚠️ user config directory '/Users/capstone2024-2025/Library/Application Support/Ultralytics' is not writeable, defaulting to '/tmp' or CWD.Alternatively you can define a YOLO_CONFIG_DIR environment variable for this path.
 Local folder '/Applications/XAMPP/xamppfiles/htdocs/testcreative/objects' is accessible.
 🔍 Checking if full directory scan is needed...
 ✅ Skipping full scan. Scanning only new files.
-🚀 Scanning 15 files (New + Missing Metadata)...
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg
-🛠️ Populating missing metadata for file ID 22950: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22950: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg
+🚀 Scanning 6 files (New + Missing Metadata)...
+🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0452.jpg
+🛠️ Populating missing metadata for file ID 23034: ['datecreated', 'filehash', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
+🔍 Processing AI for File ID 23034: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0452.jpg
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg: 640x640 1 orange, 86.6ms
-Speed: 4.3ms preprocess, 86.6ms inference, 8.4ms postprocess per image at shape (1, 3, 640, 640)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0452.jpg: 448x640 2 persons, 2 ties, 1 potted plant, 62.4ms
+Speed: 6.8ms preprocess, 62.4ms inference, 9.8ms postprocess per image at shape (1, 3, 448, 640)
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 8.9ms
-Speed: 11.1ms preprocess, 8.9ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0452.jpg: 224x224 groom 0.45, bow_tie 0.20, Windsor_tie 0.06, mortarboard 0.05, torch 0.05, 7.5ms
+Speed: 88.8ms preprocess, 7.5ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg: 640x640 1 person, 68.9ms
-Speed: 1.9ms preprocess, 68.9ms inference, 5.0ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22950
-✅ Finished populating metadata for file ID 22950
-🔍 Processing AI for File ID 22950: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0452.jpg: 448x640 2 persons, 55.3ms
+Speed: 3.1ms preprocess, 55.3ms inference, 1.9ms postprocess per image at shape (1, 3, 448, 640)
+>> [IMAGE] Detected objects: person, person
+>> [IMAGE] Classification: groom
+>> [IMAGE] Pose gesture: No clear gesture detected
+>> [IMAGE] Emotion: happy
+>> Updating database with the following values:
+   Detected Objects: person, person
+   Classification: groom
+   Pose Keypoints: [[[3704.43701171875, 1184.368896484375], [3833.11962890625, 1080.2410888671875], [3593.435546875, 1082.2596435546875], [4035.359619140625, 1187.4437255859375], [3430.914306640625, 1184.650146484375], [4349.91259765625, 1789.86474609375], [3178.06005859375, 1831.6416015625], [4563.62158203125, 2538.660888671875], [3110.754150390625, 2706.914794921875], [3494.916748046875, 2631.4462890625], [4088.962890625, 2754.854736328125], [4251.25927734375, 3510.935791015625], [3414.227783203125, 3520.507080078125], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], [[2201.272216796875, 771.7302856445312], [2318.511474609375, 678.4158325195312], [2079.20263671875, 659.2122802734375], [2461.17724609375, 827.4177856445312], [1853.6219482421875, 787.7767944335938], [2703.283203125, 1564.5584716796875], [1536.140625, 1506.9407958984375], [2759.34912109375, 2502.15478515625], [1505.089599609375, 2495.557373046875], [1802.6004638671875, 2274.631103515625], [2322.347900390625, 2550.987548828125], [2493.139404296875, 3333.8056640625], [1662.1844482421875, 3296.810302734375], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]]
+   Pose Gesture: No clear gesture detected
+   Emotion: happy
+   Content Hash: 5003fe37b9ae7fc828026160e2896b44dcfddf9d2ee20537dbc858b29a0ea5f0
+   Bounding Boxes: [{"label": "person", "x": 2106.5986328125, "y": 1991.791015625, "width": 1695.838623046875, "height": 3590.56591796875, "confidence": 0.9458472728729248}, {"label": "person", "x": 3852.29541015625, "y": 2216.133544921875, "width": 1975.699951171875, "height": 3153.47509765625, "confidence": 0.9308957457542419}]
+✅ Updated AI results for File ID 23034
+✅ Finished populating metadata for file ID 23034
+🔍 Processing AI for File ID 23034: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0452.jpg
+File type 'image/jpeg' not supported for AI processing.
+Progress: 16.67%
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg: 640x640 1 orange, 65.9ms
-Speed: 1.7ms preprocess, 65.9ms inference, 0.7ms postprocess per image at shape (1, 3, 640, 640)
+🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0532.jpg
+🛠️ Populating missing metadata for file ID 23035: ['datecreated', 'filehash', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
+🔍 Processing AI for File ID 23035: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0532.jpg
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 5.7ms
-Speed: 2.7ms preprocess, 5.7ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0532.jpg: 448x640 4 persons, 5 ties, 51.7ms
+Speed: 2.2ms preprocess, 51.7ms inference, 4.4ms postprocess per image at shape (1, 3, 448, 640)
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 9.jpg: 640x640 1 person, 71.5ms
-Speed: 1.6ms preprocess, 71.5ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22950
-Progress: 6.67%
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0532.jpg: 224x224 bow_tie 0.22, groom 0.15, ocarina 0.08, theater_curtain 0.07, stage 0.06, 12.8ms
+Speed: 80.6ms preprocess, 12.8ms inference, 3.1ms postprocess per image at shape (1, 3, 224, 224)
 
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg
-🛠️ Populating missing metadata for file ID 22955: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22955: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg: 640x640 1 orange, 58.6ms
-Speed: 1.7ms preprocess, 58.6ms inference, 1.2ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 5.3ms
-Speed: 2.7ms preprocess, 5.3ms inference, 0.3ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg: 640x640 1 person, 71.9ms
-Speed: 1.7ms preprocess, 71.9ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22955
-✅ Finished populating metadata for file ID 22955
-🔍 Processing AI for File ID 22955: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg: 640x640 1 orange, 62.2ms
-Speed: 1.6ms preprocess, 62.2ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 4.8ms
-Speed: 2.6ms preprocess, 4.8ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 12.jpg: 640x640 1 person, 79.5ms
-Speed: 1.6ms preprocess, 79.5ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22955
-Progress: 13.33%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg
-🛠️ Populating missing metadata for file ID 22957: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22957: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg: 640x640 1 orange, 62.8ms
-Speed: 1.6ms preprocess, 62.8ms inference, 1.0ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 4.4ms
-Speed: 2.6ms preprocess, 4.4ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg: 640x640 1 person, 70.6ms
-Speed: 1.6ms preprocess, 70.6ms inference, 0.5ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22957
-✅ Finished populating metadata for file ID 22957
-🔍 Processing AI for File ID 22957: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg: 640x640 1 orange, 56.0ms
-Speed: 1.6ms preprocess, 56.0ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 5.5ms
-Speed: 2.5ms preprocess, 5.5ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 13.jpg: 640x640 1 person, 63.0ms
-Speed: 1.6ms preprocess, 63.0ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22957
-Progress: 20.00%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg
-🛠️ Populating missing metadata for file ID 22958: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22958: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg: 640x640 1 orange, 59.8ms
-Speed: 1.5ms preprocess, 59.8ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 6.5ms
-Speed: 2.6ms preprocess, 6.5ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg: 640x640 1 person, 65.4ms
-Speed: 1.5ms preprocess, 65.4ms inference, 1.1ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22958
-✅ Finished populating metadata for file ID 22958
-🔍 Processing AI for File ID 22958: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg: 640x640 1 orange, 63.0ms
-Speed: 1.7ms preprocess, 63.0ms inference, 0.9ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 7.2ms
-Speed: 2.8ms preprocess, 7.2ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 11.jpg: 640x640 1 person, 90.0ms
-Speed: 1.7ms preprocess, 90.0ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22958
-Progress: 26.67%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg
-🛠️ Populating missing metadata for file ID 22959: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22959: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg: 640x640 1 orange, 80.1ms
-Speed: 1.7ms preprocess, 80.1ms inference, 0.9ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 7.3ms
-Speed: 3.0ms preprocess, 7.3ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg: 640x640 1 person, 68.5ms
-Speed: 1.6ms preprocess, 68.5ms inference, 0.5ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22959
-✅ Finished populating metadata for file ID 22959
-🔍 Processing AI for File ID 22959: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg: 640x640 1 orange, 109.1ms
-Speed: 1.9ms preprocess, 109.1ms inference, 2.2ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 7.5ms
-Speed: 3.0ms preprocess, 7.5ms inference, 0.1ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 10.jpg: 640x640 1 person, 76.9ms
-Speed: 1.6ms preprocess, 76.9ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22959
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0532.jpg: 448x640 3 persons, 62.4ms
+Speed: 1.6ms preprocess, 62.4ms inference, 3.7ms postprocess per image at shape (1, 3, 448, 640)
+>> [IMAGE] Detected objects: person, person, person
+>> [IMAGE] Classification: bow_tie
+>> [IMAGE] Pose gesture: No clear gesture detected
+>> [IMAGE] Emotion: angry
+>> Updating database with the following values:
+   Detected Objects: person, person, person
+   Classification: bow_tie
+   Pose Keypoints: [[[4605.7587890625, 774.1092529296875], [4726.95263671875, 658.7340087890625], [4575.13134765625, 665.4775390625], [5076.77978515625, 667.5531005859375], [0.0, 0.0], [5550.205078125, 1286.4110107421875], [4545.765625, 1315.613525390625], [5746.052734375, 2092.374755859375], [4400.779296875, 2156.82861328125], [5044.2509765625, 2088.238525390625], [4189.50634765625, 2905.878662109375], [5329.38818359375, 3077.13232421875], [4614.017578125, 3040.660400390625], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], [[2182.342529296875, 1109.70703125], [2244.11083984375, 997.3958129882812], [2031.6689453125, 1047.188720703125], [2365.597900390625, 1084.84521484375], [1849.12744140625, 1212.46923828125], [2649.026611328125, 1648.1671142578125], [1726.1514892578125, 1784.0426025390625], [2994.27197265625, 2235.693603515625], [1527.304931640625, 2634.580810546875], [2496.288818359375, 1591.9820556640625], [2257.16162109375, 2561.729248046875], [2694.89501953125, 3255.62060546875], [2081.292236328125, 3327.67822265625], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], [[939.5067138671875, 1030.2371826171875], [997.82763671875, 930.4330444335938], [809.2122802734375, 953.8899536132812], [0.0, 0.0], [601.2738647460938, 1063.13671875], [1257.820068359375, 1593.26513671875], [426.2906188964844, 1658.566650390625], [1411.2513427734375, 2306.395751953125], [330.1662902832031, 2478.502685546875], [1467.764404296875, 2643.401611328125], [361.9302978515625, 3179.01025390625], [1269.3729248046875, 3110.432373046875], [720.8035278320312, 3159.4013671875], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]]
+   Pose Gesture: No clear gesture detected
+   Emotion: angry
+   Content Hash: d587d2ba92b49606269cbc7c794003cc67a2157ae2ba87b1c185519470b1c862
+   Bounding Boxes: [{"label": "person", "x": 2259.537353515625, "y": 2219.1943359375, "width": 1631.912109375, "height": 3155.65576171875, "confidence": 0.9455459713935852}, {"label": "person", "x": 4871.3505859375, "y": 1974.500244140625, "width": 1766.73583984375, "height": 3645.37451171875, "confidence": 0.9214125275611877}, {"label": "person", "x": 908.6497802734375, "y": 2181.99609375, "width": 1444.177001953125, "height": 3239.2490234375, "confidence": 0.8922296166419983}]
+✅ Updated AI results for File ID 23035
+✅ Finished populating metadata for file ID 23035
+🔍 Processing AI for File ID 23035: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0532.jpg
+File type 'image/jpeg' not supported for AI processing.
 Progress: 33.33%
 
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg
-🛠️ Populating missing metadata for file ID 22961: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22961: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg
+🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0730.jpg
+🛠️ Populating missing metadata for file ID 23036: ['datecreated', 'filehash', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
+🔍 Processing AI for File ID 23036: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0730.jpg
 
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 640x576 1 apple, 54.9ms
-Speed: 1.2ms preprocess, 54.9ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 576)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0730.jpg: 448x640 2 persons, 2 cell phones, 80.2ms
+Speed: 2.3ms preprocess, 80.2ms inference, 5.9ms postprocess per image at shape (1, 3, 448, 640)
 
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 224x224 Granny_Smith 0.86, pomegranate 0.03, strawberry 0.03, vase 0.03, buckeye 0.02, 4.7ms
-Speed: 1.1ms preprocess, 4.7ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0730.jpg: 224x224 groom 0.19, lab_coat 0.14, ocarina 0.08, bow_tie 0.07, Windsor_tie 0.05, 17.9ms
+Speed: 78.1ms preprocess, 17.9ms inference, 3.2ms postprocess per image at shape (1, 3, 224, 224)
 
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 640x576 1 person, 60.1ms
-Speed: 1.2ms preprocess, 60.1ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 576)
-✅ Updated AI results for File ID 22961
-✅ Finished populating metadata for file ID 22961
-🔍 Processing AI for File ID 22961: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0730.jpg: 448x640 2 persons, 129.5ms
+Speed: 30.7ms preprocess, 129.5ms inference, 4.3ms postprocess per image at shape (1, 3, 448, 640)
+>> [IMAGE] Detected objects: person, person
+>> [IMAGE] Classification: groom
+>> [IMAGE] Pose gesture: No clear gesture detected
+>> [IMAGE] Emotion: happy
+>> Updating database with the following values:
+   Detected Objects: person, person
+   Classification: groom
+   Pose Keypoints: [[[4546.97216796875, 863.1135864257812], [4598.47509765625, 719.471923828125], [4323.11328125, 743.8585205078125], [0.0, 0.0], [3941.64990234375, 938.4779052734375], [5056.8388671875, 1748.9681396484375], [3633.577880859375, 1761.6368408203125], [5404.73193359375, 2948.52099609375], [3714.941650390625, 2934.148681640625], [5004.7509765625, 3567.86962890625], [4570.74951171875, 3540.744384765625], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], [[2144.1904296875, 1215.997314453125], [2236.134033203125, 1057.4515380859375], [1914.6109619140625, 1103.010498046875], [2367.164794921875, 1227.3663330078125], [1598.7274169921875, 1365.0067138671875], [2814.479736328125, 2112.261962890625], [1246.315185546875, 2262.2578125], [3074.847900390625, 3345.905517578125], [1253.3955078125, 3323.86279296875], [3072.226318359375, 3807.19775390625], [2125.110595703125, 2190.329833984375], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]]
+   Pose Gesture: No clear gesture detected
+   Emotion: happy
+   Content Hash: 5003fe37b9ae7fc828026160e2896b44dcfddf9d2ee20537dbc858b29a0ea5f0
+   Bounding Boxes: [{"label": "person", "x": 4434.60546875, "y": 1994.5291748046875, "width": 2395.6162109375, "height": 3618.093994140625, "confidence": 0.9386200904846191}, {"label": "person", "x": 2117.6015625, "y": 2193.7900390625, "width": 2466.435546875, "height": 3208.45068359375, "confidence": 0.9371039867401123}]
+✅ Updated AI results for File ID 23036
+✅ Finished populating metadata for file ID 23036
+🔍 Processing AI for File ID 23036: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0730.jpg
+File type 'image/jpeg' not supported for AI processing.
+Progress: 50.00%
 
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 640x576 1 apple, 52.5ms
-Speed: 1.4ms preprocess, 52.5ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 576)
+🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0490.jpg
+🛠️ Populating missing metadata for file ID 23037: ['datecreated', 'filehash', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
+🔍 Processing AI for File ID 23037: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0490.jpg
 
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 224x224 Granny_Smith 0.86, pomegranate 0.03, strawberry 0.03, vase 0.03, buckeye 0.02, 4.4ms
-Speed: 1.1ms preprocess, 4.4ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0490.jpg: 448x640 2 persons, 1 cell phone, 80.2ms
+Speed: 5.7ms preprocess, 80.2ms inference, 3.7ms postprocess per image at shape (1, 3, 448, 640)
 
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 640x576 1 person, 62.7ms
-Speed: 1.2ms preprocess, 62.7ms inference, 0.5ms postprocess per image at shape (1, 3, 640, 576)
-✅ Updated AI results for File ID 22961
-⚠️ AI metadata incomplete for File ID 22961, retrying scan...
-🔍 Processing AI for File ID 22961: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0490.jpg: 224x224 chest 0.23, drum 0.09, beer_glass 0.09, shield 0.03, gong 0.03, 6.8ms
+Speed: 81.4ms preprocess, 6.8ms inference, 1.0ms postprocess per image at shape (1, 3, 224, 224)
 
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 640x576 1 apple, 51.4ms
-Speed: 1.3ms preprocess, 51.4ms inference, 0.7ms postprocess per image at shape (1, 3, 640, 576)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 224x224 Granny_Smith 0.86, pomegranate 0.03, strawberry 0.03, vase 0.03, buckeye 0.02, 4.5ms
-Speed: 1.1ms preprocess, 4.5ms inference, 0.1ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_89 copy.jpg: 640x576 1 person, 67.6ms
-Speed: 1.4ms preprocess, 67.6ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 576)
-✅ Updated AI results for File ID 22961
-Progress: 40.00%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg
-🛠️ Populating missing metadata for file ID 22963: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22963: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg: 640x640 1 orange, 63.7ms
-Speed: 1.8ms preprocess, 63.7ms inference, 0.7ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 6.0ms
-Speed: 2.7ms preprocess, 6.0ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg: 640x640 1 person, 73.6ms
-Speed: 2.0ms preprocess, 73.6ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22963
-✅ Finished populating metadata for file ID 22963
-🔍 Processing AI for File ID 22963: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg: 640x640 1 orange, 58.2ms
-Speed: 1.5ms preprocess, 58.2ms inference, 0.8ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 5.8ms
-Speed: 2.8ms preprocess, 5.8ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 2.jpg: 640x640 1 person, 70.1ms
-Speed: 1.6ms preprocess, 70.1ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22963
-Progress: 46.67%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg
-🛠️ Populating missing metadata for file ID 22964: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22964: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg: 640x640 1 orange, 66.0ms
-Speed: 1.5ms preprocess, 66.0ms inference, 0.9ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 4.6ms
-Speed: 2.6ms preprocess, 4.6ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg: 640x640 1 person, 70.1ms
-Speed: 1.6ms preprocess, 70.1ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22964
-✅ Finished populating metadata for file ID 22964
-🔍 Processing AI for File ID 22964: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg: 640x640 1 orange, 63.3ms
-Speed: 1.5ms preprocess, 63.3ms inference, 1.3ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 4.7ms
-Speed: 2.6ms preprocess, 4.7ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 3.jpg: 640x640 1 person, 73.0ms
-Speed: 1.5ms preprocess, 73.0ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22964
-Progress: 53.33%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg
-🛠️ Populating missing metadata for file ID 22965: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22965: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg: 608x640 1 apple, 61.5ms
-Speed: 1.5ms preprocess, 61.5ms inference, 0.6ms postprocess per image at shape (1, 3, 608, 640)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg: 224x224 hip 0.47, Granny_Smith 0.18, pomegranate 0.08, candle 0.06, bell_pepper 0.05, 5.7ms
-Speed: 2.8ms preprocess, 5.7ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg: 608x640 1 person, 68.3ms
-Speed: 1.5ms preprocess, 68.3ms inference, 0.3ms postprocess per image at shape (1, 3, 608, 640)
-✅ Updated AI results for File ID 22965
-✅ Finished populating metadata for file ID 22965
-🔍 Processing AI for File ID 22965: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg: 608x640 1 apple, 64.1ms
-Speed: 1.9ms preprocess, 64.1ms inference, 1.6ms postprocess per image at shape (1, 3, 608, 640)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg: 224x224 hip 0.47, Granny_Smith 0.18, pomegranate 0.08, candle 0.06, bell_pepper 0.05, 5.5ms
-Speed: 3.0ms preprocess, 5.5ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_83 copy.jpg: 608x640 1 person, 65.5ms
-Speed: 1.7ms preprocess, 65.5ms inference, 0.3ms postprocess per image at shape (1, 3, 608, 640)
-✅ Updated AI results for File ID 22965
-Progress: 60.00%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg
-🛠️ Populating missing metadata for file ID 22966: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22966: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg: 640x576 1 apple, 54.8ms
-Speed: 1.7ms preprocess, 54.8ms inference, 0.9ms postprocess per image at shape (1, 3, 640, 576)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg: 224x224 Granny_Smith 0.79, buckeye 0.10, hip 0.05, strawberry 0.03, bell_pepper 0.01, 4.1ms
-Speed: 10.2ms preprocess, 4.1ms inference, 0.2ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg: 640x576 (no detections), 58.6ms
-Speed: 1.7ms preprocess, 58.6ms inference, 0.2ms postprocess per image at shape (1, 3, 640, 576)
-✅ Updated AI results for File ID 22966
-✅ Finished populating metadata for file ID 22966
-🔍 Processing AI for File ID 22966: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg: 640x576 1 apple, 64.8ms
-Speed: 1.9ms preprocess, 64.8ms inference, 0.9ms postprocess per image at shape (1, 3, 640, 576)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg: 224x224 Granny_Smith 0.79, buckeye 0.10, hip 0.05, strawberry 0.03, bell_pepper 0.01, 6.0ms
-Speed: 11.2ms preprocess, 6.0ms inference, 0.1ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_81.jpg: 640x576 (no detections), 67.7ms
-Speed: 1.8ms preprocess, 67.7ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 576)
-✅ Updated AI results for File ID 22966
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0490.jpg: 448x640 2 persons, 59.0ms
+Speed: 1.6ms preprocess, 59.0ms inference, 2.3ms postprocess per image at shape (1, 3, 448, 640)
+>> [IMAGE] Detected objects: None
+>> [IMAGE] Classification: chest
+>> [IMAGE] Pose gesture: No clear gesture detected
+>> [IMAGE] Emotion: neutral
+>> Updating database with the following values:
+   Detected Objects: None
+   Classification: chest
+   Pose Keypoints: [[[2960.611083984375, 1207.6806640625], [3103.8720703125, 1076.9781494140625], [2871.87548828125, 1088.7095947265625], [3388.144287109375, 1143.4852294921875], [0.0, 0.0], [3717.71142578125, 1849.6212158203125], [2652.266357421875, 1767.2149658203125], [4018.17431640625, 2699.01318359375], [2208.527587890625, 2381.48388671875], [3365.9736328125, 2330.244384765625], [2555.13623046875, 1804.641845703125], [3478.864990234375, 3400.740478515625], [2779.76025390625, 3357.875244140625], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], [[5710.99267578125, 1020.69970703125], [0.0, 0.0], [5469.62353515625, 748.9933471679688], [0.0, 0.0], [4825.99169921875, 736.9639892578125], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]]
+   Pose Gesture: No clear gesture detected
+   Emotion: neutral
+   Content Hash: 323cceb85395b9bd4d2ed5131226e260f9ded5fa43aecc2309c56f95fa870f0f
+   Bounding Boxes: []
+✅ Updated AI results for File ID 23037
+✅ Finished populating metadata for file ID 23037
+🔍 Processing AI for File ID 23037: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0490.jpg
+File type 'image/jpeg' not supported for AI processing.
+⚠️ AI metadata incomplete for File ID 23037, retrying scan...
+🔍 Processing AI for File ID 23037: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0490.jpg
+File type 'image/jpeg' not supported for AI processing.
 Progress: 66.67%
 
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg
-🛠️ Populating missing metadata for file ID 22969: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22969: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg
+🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0484.jpg
+🛠️ Populating missing metadata for file ID 23038: ['datecreated', 'filehash', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
+🔍 Processing AI for File ID 23038: /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0484.jpg
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg: 640x640 1 orange, 64.1ms
-Speed: 2.0ms preprocess, 64.1ms inference, 0.9ms postprocess per image at shape (1, 3, 640, 640)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0484.jpg: 448x640 9 persons, 1 bottle, 10 chairs, 1 dining table, 1 cell phone, 77.1ms
+Speed: 5.1ms preprocess, 77.1ms inference, 4.9ms postprocess per image at shape (1, 3, 448, 640)
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 5.7ms
-Speed: 2.7ms preprocess, 5.7ms inference, 0.2ms postprocess per image at shape (1, 3, 224, 224)
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0484.jpg: 224x224 tricycle 0.14, plunger 0.13, torch 0.10, stage 0.07, maraca 0.06, 11.7ms
+Speed: 85.7ms preprocess, 11.7ms inference, 3.2ms postprocess per image at shape (1, 3, 224, 224)
 
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg: 640x640 1 person, 67.1ms
-Speed: 1.5ms preprocess, 67.1ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22969
-✅ Finished populating metadata for file ID 22969
-🔍 Processing AI for File ID 22969: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg: 640x640 1 orange, 55.0ms
-Speed: 1.6ms preprocess, 55.0ms inference, 0.7ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 4.4ms
-Speed: 2.6ms preprocess, 4.4ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 7.jpg: 640x640 1 person, 70.1ms
-Speed: 1.9ms preprocess, 70.1ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22969
-Progress: 73.33%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg
-🛠️ Populating missing metadata for file ID 22970: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22970: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg: 640x640 1 orange, 60.6ms
-Speed: 1.7ms preprocess, 60.6ms inference, 0.8ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 5.7ms
-Speed: 2.7ms preprocess, 5.7ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg: 640x640 1 person, 72.8ms
-Speed: 1.6ms preprocess, 72.8ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22970
-✅ Finished populating metadata for file ID 22970
-🔍 Processing AI for File ID 22970: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg: 640x640 1 orange, 58.9ms
-Speed: 1.5ms preprocess, 58.9ms inference, 0.8ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 9.8ms
-Speed: 3.4ms preprocess, 9.8ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 6.jpg: 640x640 1 person, 66.0ms
-Speed: 1.6ms preprocess, 66.0ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22970
-Progress: 80.00%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg
-🛠️ Populating missing metadata for file ID 22971: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22971: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 640x608 1 apple, 58.6ms
-Speed: 2.2ms preprocess, 58.6ms inference, 1.0ms postprocess per image at shape (1, 3, 640, 608)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 224x224 pomegranate 0.34, Granny_Smith 0.28, buckeye 0.17, bagel 0.06, fig 0.04, 6.2ms
-Speed: 13.3ms preprocess, 6.2ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 640x608 1 person, 73.9ms
-Speed: 1.9ms preprocess, 73.9ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 608)
-✅ Updated AI results for File ID 22971
-✅ Finished populating metadata for file ID 22971
-🔍 Processing AI for File ID 22971: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 640x608 1 apple, 64.8ms
-Speed: 2.0ms preprocess, 64.8ms inference, 0.8ms postprocess per image at shape (1, 3, 640, 608)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 224x224 pomegranate 0.34, Granny_Smith 0.28, buckeye 0.17, bagel 0.06, fig 0.04, 5.7ms
-Speed: 13.7ms preprocess, 5.7ms inference, 0.1ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 640x608 1 person, 67.9ms
-Speed: 1.9ms preprocess, 67.9ms inference, 0.6ms postprocess per image at shape (1, 3, 640, 608)
-✅ Updated AI results for File ID 22971
-⚠️ AI metadata incomplete for File ID 22971, retrying scan...
-🔍 Processing AI for File ID 22971: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 640x608 1 apple, 80.8ms
-Speed: 2.1ms preprocess, 80.8ms inference, 1.1ms postprocess per image at shape (1, 3, 640, 608)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 224x224 pomegranate 0.34, Granny_Smith 0.28, buckeye 0.17, bagel 0.06, fig 0.04, 7.9ms
-Speed: 14.4ms preprocess, 7.9ms inference, 0.2ms postprocess per image at shape (1, 3, 224, 224)
-
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_90.jpg: 640x608 1 person, 70.1ms
-Speed: 2.1ms preprocess, 70.1ms inference, 0.5ms postprocess per image at shape (1, 3, 640, 608)
-✅ Updated AI results for File ID 22971
-Progress: 86.67%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg
-🛠️ Populating missing metadata for file ID 22974: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22974: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg: 640x640 1 orange, 76.3ms
-Speed: 1.7ms preprocess, 76.3ms inference, 1.0ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 6.7ms
-Speed: 2.8ms preprocess, 6.7ms inference, 0.2ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg: 640x640 1 person, 65.8ms
-Speed: 1.6ms preprocess, 65.8ms inference, 0.5ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22974
-✅ Finished populating metadata for file ID 22974
-🔍 Processing AI for File ID 22974: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg: 640x640 1 orange, 61.4ms
-Speed: 1.5ms preprocess, 61.4ms inference, 1.4ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 6.8ms
-Speed: 2.8ms preprocess, 6.8ms inference, 0.2ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 4.jpg: 640x640 1 person, 73.1ms
-Speed: 1.5ms preprocess, 73.1ms inference, 0.3ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22974
-Progress: 93.33%
-
-🔍 Processing file: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg
-🛠️ Populating missing metadata for file ID 22975: ['datecreated', 'detected_objects', 'classification', 'pose', 'gesture', 'emotion', 'bounding_boxes']
-🔍 Processing AI for File ID 22975: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg: 640x640 1 orange, 63.5ms
-Speed: 1.6ms preprocess, 63.5ms inference, 0.7ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 6.0ms
-Speed: 2.7ms preprocess, 6.0ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg: 640x640 1 person, 72.8ms
-Speed: 1.6ms preprocess, 72.8ms inference, 0.5ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22975
-✅ Finished populating metadata for file ID 22975
-🔍 Processing AI for File ID 22975: /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg: 640x640 1 orange, 78.8ms
-Speed: 1.6ms preprocess, 78.8ms inference, 0.8ms postprocess per image at shape (1, 3, 640, 640)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg: 224x224 croquet_ball 0.22, orange 0.09, pomegranate 0.07, tennis_ball 0.07, bell_pepper 0.06, 5.7ms
-Speed: 2.7ms preprocess, 5.7ms inference, 0.0ms postprocess per image at shape (1, 3, 224, 224)
-
-libpng warning: iCCP: known incorrect sRGB profile
-image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/objects/apple_79 copy 5.jpg: 640x640 1 person, 76.0ms
-Speed: 1.7ms preprocess, 76.0ms inference, 0.4ms postprocess per image at shape (1, 3, 640, 640)
-libpng warning: iCCP: known incorrect sRGB profile
-✅ Updated AI results for File ID 22975
-Progress: 100.00%
-
-✅ Finished scanning new & incomplete files.
-✅ Database connection closed.
-Scan completed successfully.
+image 1/1 /Applications/XAMPP/xamppfiles/htdocs/testcreative/Files for ifound/7K6A0484.jpg: 448x640 6 persons, 65.5ms
+Speed: 1.9ms preprocess, 65.5ms inference, 3.8ms postprocess per image at shape (1, 3, 448, 640)

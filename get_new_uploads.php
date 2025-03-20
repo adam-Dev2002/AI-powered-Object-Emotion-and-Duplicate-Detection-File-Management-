@@ -5,11 +5,11 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 try {
-    // Query to only count distinct filehashes where last_scanned is NULL, preventing duplicates
+    // Just count all files where last_scanned is NULL
     $stmt = $conn->query("
-        SELECT COUNT(DISTINCT filehash) AS new_files 
-        FROM files 
-        WHERE last_scanned IS NULL AND filehash IS NOT NULL
+        SELECT COUNT(*) AS new_files
+        FROM files
+        WHERE last_scanned IS NULL
     ");
     $result = $stmt->fetch_assoc();
 

@@ -605,9 +605,11 @@ def calculate_content_hash(detected_objects, pose_gesture, emotions):
 # Process individual files
 def process_file(file_id, file_path, file_type):
     """Perform AI detection and update the database with human-readable metadata while keeping keypoints and bounding boxes intact."""
-    # Initialize common variables so they are always available
-    detected_objects_str = "None"
-    bounding_boxes_json = "[]"
+    # Initialize variables with default values so they're always available
+    detected_objects = []
+    bounding_boxes = []
+    detected_objects_str = "None"  # Default string if no objects detected
+    bounding_boxes_json = "[]"     # Default empty JSON array
     classification = "Unknown"
     pose_keypoints = []
     pose_gesture = "No gesture detected"
@@ -619,22 +621,31 @@ def process_file(file_id, file_path, file_type):
 
         if file_type in image_extensions:
             # Process image files
+            # Initialize pose_data with a default value
             pose_data = {"keypoints": [], "gesture": "No gesture detected"}
 
+            # Call AI functions for images
             detected_objects, bounding_boxes = scan_image(file_path) or ([], [])
             classification_result = classify_image(file_path) or {}
-            pose_data = estimate_pose(file_path) or pose_data  # Ensure pose_data is always assigned
+            pose_data = estimate_pose(file_path) or pose_data
             emotion = detect_emotion(file_path) or "Unknown"
 
+            # Extract classification and pose data
             classification = classification_result.get("class", "Unknown")
             pose_gesture = pose_data.get("gesture", "No gesture detected")
             pose_keypoints = pose_data.get("keypoints", [])
 
+            # Create human-readable strings for objects and bounding boxes
             detected_objects_str = ", ".join(detected_objects) if detected_objects else "None"
             bounding_boxes_json = json.dumps(bounding_boxes) if bounding_boxes else "[]"
 
             # Build the content hash based on detected objects, gesture, and emotion
             content_hash = calculate_content_hash(detected_objects, pose_gesture, emotion)
+
+            print(">> [IMAGE] Detected objects:", detected_objects_str)
+            print(">> [IMAGE] Classification:", classification)
+            print(">> [IMAGE] Pose gesture:", pose_gesture)
+            print(">> [IMAGE] Emotion:", emotion)
 
         elif file_type in video_extensions:
             # Process video files
@@ -643,15 +654,28 @@ def process_file(file_id, file_path, file_type):
             detected_objects_str = ", ".join(detected_objects) if detected_objects else "None"
             bounding_boxes_json = json.dumps(bounding_boxes) if bounding_boxes else "[]"
 
-            # For videos, use video emotion analysis (no pose)
+            # For videos, we use video-specific emotion analysis (no pose data)
             emotion = analyze_emotion_in_video(file_path) or "Neutral"
             content_hash = calculate_content_hash(detected_objects, classification, emotion)
+
+            print(">> [VIDEO] Detected objects:", detected_objects_str)
+            print(">> [VIDEO] Emotion:", emotion)
 
         else:
             print(f"File type '{file_type}' not supported for AI processing.")
             return
 
-        # Update the database with the computed AI results
+        # Debug log: Print values before updating the database
+        print(">> Updating database with the following values:")
+        print("   Detected Objects:", detected_objects_str)
+        print("   Classification:", classification)
+        print("   Pose Keypoints:", pose_keypoints)
+        print("   Pose Gesture:", pose_gesture)
+        print("   Emotion:", emotion)
+        print("   Content Hash:", content_hash)
+        print("   Bounding Boxes:", bounding_boxes_json)
+
+        # Update the file record in the database with the computed AI results
         sql = """
             UPDATE files
             SET detected_objects = %s, classification = %s, pose = %s,
@@ -675,6 +699,7 @@ def process_file(file_id, file_path, file_type):
 
     except Exception as e:
         print(f"❌ Error processing AI for file ID {file_id}: {e}")
+
 
 
 
