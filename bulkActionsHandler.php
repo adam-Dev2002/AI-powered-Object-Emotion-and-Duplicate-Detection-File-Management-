@@ -125,33 +125,67 @@ function handleBulkMoveToTrash(array $files, $conn, $trashDirectory)
     $movedFiles = 0;
     $errors = [];
 
-    // ✅ Create Trash directory if it doesn't exist
-    if (!is_dir($trashDirectory)) {
-        mkdir($trashDirectory, 0777, true);
-    }
+    // We assume $trashDirectory is something like:
+    //   "/Applications/XAMPP/xamppfiles/htdocs/testcreative/TRASH"
+    // so that physically, rename() can move the file.
 
     foreach ($files as $file) {
-        $oldPath = trim($file['filepath'] ?? '');
+        $oldPath  = trim($file['filepath'] ?? '');
         $filename = trim($file['filename'] ?? basename($oldPath));
 
+        // 1) Make sure file physically exists
         if (!$oldPath || !file_exists($oldPath)) {
-            error_log("❌ ERROR: File does not exist: $oldPath");
+            error_log("❌ File does not exist: $oldPath");
             $errors[] = "File not found: $filename";
             continue;
         }
 
-        // ✅ Ensure unique filenames in trash (Prevent overwriting)
+        // 2) Build new path in $trashDirectory (physically)
         $safeFileName = basename($filename);
         $newPath = rtrim($trashDirectory, '/') . '/' . $safeFileName;
 
+        // If file with same name exists in TRASH, append timestamp
         if (file_exists($newPath)) {
-            $fileInfo = pathinfo($safeFileName);
-            $newPath = rtrim($trashDirectory, '/') . '/' . $fileInfo['filename'] . '_' . time() . '.' . $fileInfo['extension'];
+            $info = pathinfo($safeFileName);
+            $newPath = rtrim($trashDirectory, '/') . '/'
+                . $info['filename'] . '_' . time() . '.' . $info['extension'];
         }
 
-        // ✅ Move file to trash
+        // 3) Attempt to move file on disk
         if (rename($oldPath, $newPath)) {
-            // ✅ Delete from database (Same as your working individual move-to-trash)
+            // 3a) Gather info for DB insert
+            $fileSize    = filesize($newPath);
+            $fileExt     = pathinfo($filename, PATHINFO_EXTENSION);
+            $dateupload  = date('Y-m-d H:i:s');
+            $description = "Moved from $oldPath";
+
+            // 3b) Insert row into `trashfiles`.
+            //     **Here** we ensure real_filepath has “/TRASH” by using $newPath
+            $insert = $conn->prepare("
+                INSERT INTO trashfiles 
+                    (filename, filepath, filetype, size, dateupload, description, real_filepath)
+                VALUES 
+                    (?,?,?,?,?,?,?)
+            ");
+            if ($insert) {
+                // NOTE:
+                //   - `$filename` stays as the file name
+                //   - `filepath` can remain the old path if you want it
+                //   - `real_filepath` is the new path (with /TRASH)
+                $insert->bind_param("sssssss",
+                    $filename,         // e.g. "apple_79 copy 13.jpg"
+                    $oldPath,          // the old/original path (if you want to keep it in `filepath`)
+                    $fileExt,
+                    $fileSize,
+                    $dateupload,
+                    $description,
+                    $newPath           // the new path with /TRASH in `real_filepath`
+                );
+                $insert->execute();
+                $insert->close();
+            }
+
+            // 3c) Remove from `files` table
             $stmt = $conn->prepare("DELETE FROM files WHERE filepath = ?");
             if ($stmt) {
                 $stmt->bind_param("s", $oldPath);
@@ -169,14 +203,19 @@ function handleBulkMoveToTrash(array $files, $conn, $trashDirectory)
         }
     }
 
-    // ✅ Return JSON response
+    // 4) Return JSON
     echo json_encode([
-        'status' => empty($errors) ? 'success' : 'error',
-        'message' => empty($errors) ? "$movedFiles file(s) moved to trash." : 'Some files failed to move.',
+        'status'       => empty($errors) ? 'success' : 'error',
+        'message'      => empty($errors) ? "$movedFiles file(s) moved to trash." : 'Some files failed to move.',
         'successCount' => $movedFiles,
-        'errors' => $errors
+        'errors'       => $errors
     ]);
 }
+
+
+
+
+
 
 /**
  * ✅ Handle Bulk Download

@@ -13,12 +13,15 @@ $trash_base_url = 'http://172.16.152.47/TRASH';
 
 function convertFilePathToURL($filePath) {
     $basePath = '/Applications/XAMPP/xamppfiles/htdocs/TRASH';
-    $baseURL = 'http://172.16.152.47/TRASH';
+    $baseURL  = 'http://172.16.152.47/TRASH';
 
     if (strpos($filePath, $basePath) === 0) {
         $relative_path = substr($filePath, strlen($basePath));
-        $relative_path = ltrim($relative_path, '/');
-        return $baseURL . '/' . str_replace([' ', '\\'], ['%20', '/'], $relative_path); // Fix path
+        $relative_path = ltrim($relative_path, '/');          // remove any leading slash
+        $relative_path = str_replace('\\', '/', $relative_path);
+        $relative_path = str_replace(' ', '%20', $relative_path);
+
+        return $baseURL . '/' . $relative_path;  // e.g. http://172.16.152.47/TRASH/trashsample.jpeg
     }
     return false;
 }
@@ -27,9 +30,10 @@ function convertFilePathToURL($filePath) {
 
 
 
+
 function getTrashFilesFromDB($conn, $trash_directory, $trash_base_url) {
     $files = [];
-    $query = "SELECT * FROM trashfiles WHERE filename IS NOT NULL AND filename != '' ORDER BY dateupload DESC"; 
+    $query = "SELECT * FROM trashfiles WHERE filename IS NOT NULL AND filename != '' ORDER BY dateupload DESC";
     $stmt = $conn->prepare($query);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -88,6 +92,12 @@ usort($trashFiles, function($a, $b) {
     <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 
     <style>
+
+        .btn-success {
+            background-color: #5cb85c; /* Light green */
+            border-color: #4cae4c;
+        }
+
         #fileTable td {
             vertical-align: middle;
         }
@@ -318,68 +328,90 @@ usort($trashFiles, function($a, $b) {
 
 
     <!-- Bulk Action Buttons -->
+    <!-- Bulk Action Buttons (initially hidden) -->
     <div class="action-button-container d-flex gap-2 mb-3 d-none">
-        <!-- Delete Selected -->
+        <!-- Bulk Delete -->
         <button type="button" class="btn btn-danger d-flex align-items-center" id="deleteSelectedBtn">
             <i class="fas fa-trash-alt me-2"></i> Delete Selected
         </button>
+        <!-- Bulk Restore (light green) -->
+        <button type="button" class="btn btn-success d-flex align-items-center" id="restoreSelectedBtn">
+            <i class="fas fa-undo me-2"></i> Restore Selected
+        </button>
+        <!-- (Other bulk buttons as needed) -->
     </div>
 
 
     <div id="fileContainer" class="table-responsive">
         <table class="table table-hover table-striped" id="fileTable">
-        <thead>
-    <tr>
-        <th><input type="checkbox" id="selectAll"></th> <!-- ✅ 1st Column -->
-        <th>Thumbnail</th> <!-- ✅ 2nd Column -->
-        <th>File Name</th> <!-- ✅ 3rd Column -->
-        <th>Filepath</th> <!-- ✅ 4th Column -->
-        <th>Type</th> <!-- ✅ 5th Column -->
-        <th>Timestamp</th> <!-- ✅ 6th Column -->
-        <th>Action</th> <!-- ✅ 7th Column -->
-    </tr>
-</thead>
-
-<tbody>
-<?php foreach ($trashFiles as $index => $file): ?>
-    <tr data-path="<?php echo $file['filepath']; ?>">
-        <td><input type="checkbox" class="file-checkbox" value="<?php echo $file['filepath']; ?>"></td>
-        <td>
-            <?php if (!empty($file['thumbnail'])): ?>
-                <img src="<?php echo $file['thumbnail']; ?>" 
-                     alt="Thumbnail" 
-                     class="thumbnail"
-                     style="width: 40px; height: 40px; object-fit: cover; cursor: pointer;"
-                     onclick="openPreview('<?php echo $file['thumbnail']; ?>', '<?php echo $file['filetype']; ?>')">
-            <?php else: ?>
-                <span>No Preview</span>
-            <?php endif; ?>
-        </td>
-        <td>
-            <a href="javascript:void(0);" 
-               class="file-folder-link"
-               data-url="<?php echo $file['thumbnail']; ?>"
-               data-type="<?php echo htmlspecialchars($file['filetype']); ?>"
-               onclick="openPreview('<?php echo $file['thumbnail']; ?>', '<?php echo htmlspecialchars($file['filetype']); ?>')">
-                <?php echo htmlspecialchars($file['filename']); ?>
-            </a>
-        </td>
-        <td><?php echo htmlspecialchars($file['filepath']); ?></td>
-        <td><?php echo htmlspecialchars($file['filetype']); ?></td>
-        <td><?php echo htmlspecialchars($file['timestamp']); ?></td>
-        <td>
-            <button class="btn btn-sm btn-danger delete-file" data-path="<?php echo $file['filepath']; ?>">
-                <i class="fas fa-trash"></i> Delete
-            </button>
-            <button class="btn btn-sm btn-warning restore-file" data-path="<?php echo $file['filepath']; ?>">
-                <i class="fas fa-undo"></i> Restore
-            </button>
-        </td>
-    </tr>
-<?php endforeach; ?>
-</tbody>
-
-
+            <thead>
+            <tr>
+                <th><input type="checkbox" id="selectAll"></th> <!-- 1st Column -->
+                <th>Thumbnail</th> <!-- 2nd Column -->
+                <th>File Name</th> <!-- 3rd Column -->
+                <th>File Path</th> <!-- 4th Column -->
+                <th>Type</th>      <!-- 5th Column -->
+                <th>Timestamp</th> <!-- 6th Column -->
+                <th>Action</th>    <!-- 7th Column -->
+            </tr>
+            </thead>
+            <?php
+            // Function to shorten a string (for displaying long file paths)
+            function shortenPath($path, $maxLength = 50) {
+                if (strlen($path) <= $maxLength) {
+                    return $path;
+                }
+                return substr($path, 0, $maxLength - 3) . '...';
+            }
+            ?>
+            <tbody>
+            <?php foreach ($trashFiles as $index => $file): ?>
+                <?php $shortFilepath = shortenPath($file['filepath'], 50); ?>
+                <tr data-path="<?php echo htmlspecialchars($file['filepath']); ?>">
+                    <td>
+                        <input type="checkbox" class="file-checkbox"
+                               value="<?php echo htmlspecialchars($file['filepath']); ?>">
+                    </td>
+                    <td>
+                        <?php if (!empty($file['thumbnail'])): ?>
+                            <img src="<?php echo htmlspecialchars($file['thumbnail']); ?>"
+                                 alt="Thumbnail"
+                                 class="thumbnail"
+                                 style="width: 40px; height: 40px; object-fit: cover; cursor: pointer;"
+                                 onclick="openPreview('<?php echo htmlspecialchars($file['thumbnail']); ?>',
+                                         '<?php echo htmlspecialchars($file['filetype']); ?>')">
+                        <?php else: ?>
+                            <span>No Preview</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <!-- Display the file name as plain text without hyperlink or underline -->
+                        <span><?php echo htmlspecialchars($file['filename']); ?></span>
+                    </td>
+                    <td>
+                        <!-- Display shortened file path with a tooltip showing the full path -->
+                        <span data-bs-toggle="tooltip"
+                              title="<?php echo htmlspecialchars($file['filepath']); ?>">
+                            <?php echo htmlspecialchars($shortFilepath); ?>
+                        </span>
+                    </td>
+                    <td><?php echo htmlspecialchars($file['filetype'] ?? ''); ?></td>
+                    <td><?php echo htmlspecialchars($file['timestamp'] ?? 'N/A'); ?></td>
+                    <td>
+                        <button class="btn btn-sm btn-danger delete-file"
+                                data-path="<?php echo htmlspecialchars($file['filepath']); ?>">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                        <!-- Use a light-green button (btn-success) for restore. We pass both the real (TRASH) and original path -->
+                        <button class="btn btn-sm btn-success restore-file"
+                                data-realpath="<?php echo htmlspecialchars($file['real_filepath']); ?>"
+                                data-originalpath="<?php echo htmlspecialchars($file['filepath']); ?>">
+                            <i class="fas fa-undo"></i> Restore
+                        </button>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
 
@@ -393,52 +425,47 @@ usort($trashFiles, function($a, $b) {
     </script>
 
 
-    <!-- Grid View (Initially Hidden) -->
+
+    <!-- Grid View Container -->
+    <!-- Grid View Container -->
     <div id="grid-view" class="grid-view d-none">
         <?php foreach ($trashFiles as $file): ?>
-            <div class="grid-item" data-type="<?php echo htmlspecialchars($file['filetype']); ?>">
-                <?php
-                $fileURL = convertFilePathToURL($file['filepath']);
-                $fileType = htmlspecialchars($file['filetype']);
+            <?php
+            // Convert the file’s TRASH path to a valid URL for <img> or <video>.
+            $fileURL  = convertFilePathToURL($file['filepath']);
+            // Ensure we have a lowercased extension to check.
+            $ext      = strtolower(pathinfo($file['filename'], PATHINFO_EXTENSION));
+            $fileName = htmlspecialchars($file['filename'], ENT_QUOTES);
+            $fileType = htmlspecialchars($file['filetype'], ENT_QUOTES);
+            ?>
 
-                if (preg_match('/\.(jpg|jpeg|png|gif)$/i', $file['filepath'])) {
-                    // ✅ Image Thumbnail
-                    echo "<img src='" . htmlspecialchars($fileURL) . "' 
-                     alt='Thumbnail' 
-                     class='thumbnail'
-                     onclick=\"openPreview('" . htmlspecialchars($fileURL) . "', '$fileType')\">";
+            <div class="grid-item" data-path="<?php echo htmlspecialchars($file['filepath']); ?>">
+                <?php if (in_array($ext, ['jpg','jpeg','png','gif'])): ?>
+                    <!-- IMAGE PREVIEW -->
+                    <img src="<?php echo htmlspecialchars($fileURL); ?>"
+                         alt="Thumbnail"
+                         style="width:100%; max-height:150px; object-fit:cover; cursor:pointer;"
+                         onclick="openPreview('<?php echo htmlspecialchars($fileURL); ?>', '<?php echo $ext; ?>')">
+                <?php else: ?>
+                    <!-- NOT AN IMAGE -->
+                    <span>No Preview</span>
+                <?php endif; ?>
 
-                } elseif (preg_match('/\.(mp4|mov|avi)$/i', $file['filepath'])) {
-                    // ✅ Video Thumbnail with Play Button
-                    echo "<div class='video-thumbnail' 
-                        style='position: relative; width: 100%; cursor: pointer;'
-                        onclick=\"openPreview('" . htmlspecialchars($fileURL) . "', '$fileType')\">
-                    
-                    <video src='" . htmlspecialchars($fileURL) . "' 
-                           class='thumbnail' 
-                           muted 
-                           style='width: 100%; object-fit: cover;'>
-                    </video>
-
-                    <div class='play-button' 
-                         style='position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-                                width: 30px; height: 30px; background: rgba(0, 0, 0, 0.5); 
-                                border-radius: 50%; display: flex; justify-content: center; align-items: center;'>
-                        <i class='fas fa-play' style='color: white; font-size: 16px;'></i>
+                <!-- Basic file info below the thumbnail -->
+                <div class="file-info" style="margin-top:8px;">
+                    <div title="<?php echo $fileName; ?>">
+                        <!-- If you want to shorten the name if it's too long -->
+                        <?php echo (strlen($fileName) > 20)
+                            ? substr($fileName, 0, 20).'...'
+                            : $fileName; ?>
                     </div>
-                </div>";
-
-                } else {
-                    echo "<span>No Preview</span>";
-                }
-                ?>
-                <div class="file-info">
-                    <div><?php echo htmlspecialchars($file['item_name']); ?></div>
-                    <div><?php echo htmlspecialchars($file['filetype']); ?></div>
+                    <div><?php echo $fileType; ?></div>
                 </div>
             </div>
         <?php endforeach; ?>
     </div>
+
+
 
 
     <!-- File Preview Modal -->
@@ -449,68 +476,146 @@ usort($trashFiles, function($a, $b) {
         <div id="file-preview-content"></div>
     </div>
 
-            <!--Script for restore -->
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-    document.querySelectorAll('.restore-file').forEach(button => {
-        button.addEventListener('click', function() {
-            const filePath = this.getAttribute('data-path');
 
-            if (!filePath) {
-                document.getElementById('errorModalBody').textContent = "Error: Filepath is missing.";
-                new bootstrap.Modal(document.getElementById('errorModal')).show();
+
+<script>
+    $(document).ready(function () {
+        // Bulk Restore: Trigger when the "Restore Selected" button is clicked
+        $('#restoreSelectedBtn').click(function () {
+            let selectedFiles = $('.file-checkbox:checked').map(function () {
+                return $(this).val();
+            }).get();
+
+            if (selectedFiles.length === 0) {
+                showErrorModal("No files selected for restore.");
                 return;
             }
 
-            // Update confirmation modal content
-            document.getElementById('confirmationModalLabel').textContent = "Confirm Restore";
-            document.getElementById('confirmationModalBody').innerHTML = `
-                Are you sure you want to restore this file? <br><br>
-                <strong>${filePath}</strong>
-            `;
-            document.getElementById('confirmActionBtn').textContent = "Restore File";
+            // Extract just filenames for display in the confirmation modal
+            let filenamesForDisplay = selectedFiles.map(filePath => filePath.split('/').pop()).join("<br>");
 
-            // Show confirmation modal
-            const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-            confirmationModal.show();
+            // Open confirmation modal with the list of files to restore
+            $("#confirmationModalLabel").html("Confirm Bulk Restore");
+            $("#confirmationModalBody").html(`Are you sure you want to restore these files?<br><br>
+            <strong>${filenamesForDisplay}</strong>`);
+            $("#confirmationModal").modal("show");
 
-            // Confirm restore action
-            document.getElementById('confirmActionBtn').onclick = async function() {
-                confirmationModal.hide();
-
-                try {
-                    const response = await fetch('restoreFile.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ filepath: filePath }) // Send `real_filepath`
-                    });
-
-                    const result = await response.json();
-
-                    if (result.status === 'success') {
-                        document.getElementById('successModalBody').textContent = "File restored successfully.";
-                        new bootstrap.Modal(document.getElementById('successModal')).show();
-                        setTimeout(() => location.reload(), 2000); // Refresh after success
-                    } else {
-                        document.getElementById('errorModalBody').textContent = "Error restoring file: " + result.message;
-                        new bootstrap.Modal(document.getElementById('errorModal')).show();
-                    }
-                } catch (error) {
-                    console.error("Error restoring file:", error);
-                    document.getElementById('errorModalBody').textContent = "An unexpected error occurred.";
-                    new bootstrap.Modal(document.getElementById('errorModal')).show();
-                }
-            };
+            // Set confirm action for bulk restore
+            $("#confirmActionBtn").off("click").on("click", function () {
+                $("#confirmationModal").modal("hide");
+                performBulkRestore(selectedFiles);
+            });
         });
+
+        // Function to perform bulk restore via AJAX using restoreFile.php
+        function performBulkRestore(selectedFiles) {
+            $.ajax({
+                url: 'restoreFile.php',
+                type: 'POST',
+                data: JSON.stringify({ filepath: selectedFiles }),
+                contentType: 'application/json',
+                dataType: 'json',
+                success: function (response) {
+                    if (response.status === 'success') {
+                        showSuccessModal(response.message);
+                        // Remove restored files from UI dynamically
+                        selectedFiles.forEach(filePath => {
+                            $(`input.file-checkbox[value="${filePath}"]`).closest('tr').remove();
+                        });
+                        // Optionally, uncheck the "Select All" checkbox
+                        $('#selectAll').prop('checked', false);
+                    } else {
+                        showErrorModal("Error restoring files: " + response.message);
+                    }
+                },
+                error: function (xhr) {
+                    console.error("Error restoring files:", xhr.responseText);
+                    showErrorModal("An error occurred while restoring files.");
+                }
+            });
+        }
+
+        // (Your existing code for bulk delete, individual delete, restore, tooltips, etc. remains intact.)
     });
-});
 
+</script>
+            <!--Script for restore -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Attach click listeners to all .restore-file buttons
+            document.querySelectorAll('.restore-file').forEach(button => {
+                button.addEventListener('click', function() {
+                    // Read the file's trash path from the data attribute
+                    const filePath = this.getAttribute('data-path');
+                    console.log("Restore button clicked. File path:", filePath);
 
+                    if (!filePath) {
+                        console.error("Error: File path is missing.");
+                        document.getElementById('errorModalBody').textContent = "Error: File path is missing.";
+                        new bootstrap.Modal(document.getElementById('errorModal')).show();
+                        return;
+                    }
+
+                    // Extract only the filename for display
+                    const filename = filePath.split('/').pop();
+                    console.log("Extracted filename:", filename);
+
+                    // Update confirmation modal content
+                    document.getElementById('confirmationModalLabel').textContent = "Confirm Restore";
+                    document.getElementById('confirmationModalBody').innerHTML = `
+                Are you sure you want to restore this file?<br><br>
+                <strong>${filename}</strong>
+            `;
+                    document.getElementById('confirmActionBtn').textContent = "Restore File";
+
+                    // Show the confirmation modal
+                    const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+                    confirmationModal.show();
+
+                    // Remove any existing click handlers on the confirmation button to avoid duplicates
+                    const confirmBtn = document.getElementById('confirmActionBtn');
+                    confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+                    // Now re-select the button reference
+                    const newConfirmBtn = document.getElementById('confirmActionBtn');
+
+                    // Attach new click handler for restoring file
+                    newConfirmBtn.addEventListener('click', async function restoreHandler() {
+                        console.log("Restore confirmed for file:", filePath);
+                        confirmationModal.hide(); // Hide modal immediately
+
+                        try {
+                            const response = await fetch('restoreFile.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ filepath: filePath })
+                            });
+                            console.log("Restore fetch response:", response);
+                            const result = await response.json();
+                            console.log("Restore fetch result:", result);
+                            if (result.status === 'success') {
+                                document.getElementById('successModalBody').textContent = "File restored successfully.";
+                                new bootstrap.Modal(document.getElementById('successModal')).show();
+                                setTimeout(() => location.reload(), 2000);
+                            } else {
+                                document.getElementById('errorModalBody').textContent =
+                                    "Error restoring file: " + result.message;
+                                new bootstrap.Modal(document.getElementById('errorModal')).show();
+                            }
+                        } catch (error) {
+                            console.error("Error restoring file:", error);
+                            document.getElementById('errorModalBody').textContent = "An unexpected error occurred.";
+                            new bootstrap.Modal(document.getElementById('errorModal')).show();
+                        }
+                    }, { once: true });
+                });
+            });
+        });
 
     </script>
 
 
-<script>
+
+    <script>
 
     function openPreview(fileUrl, fileType) {
         const overlay = document.getElementById('file-preview-overlay');
@@ -708,7 +813,7 @@ usort($trashFiles, function($a, $b) {
 
             // ✅ Open Confirmation Modal (Display Filename)
             $("#confirmationModalLabel").html("Confirm Delete");
-            $("#confirmationModalBody").html(`Are you sure you want to delete this file? <br><br>
+            $("#confirmationModalBody").html(`Are you sure you want to permanently delete this file? <br><br>
         <strong>${filename}</strong>`); // ✅ Only filename shown
             $("#confirmationModal").modal("show");
 
@@ -764,7 +869,7 @@ usort($trashFiles, function($a, $b) {
     // ✅ Individual File Delete Function
     function deleteFile(filePath) {
         $.ajax({
-            url: 'delete_file.php',
+            url: 'delete_file_trash.php',
             type: 'POST',
             data: { filepath: filePath },
             dataType: 'text',

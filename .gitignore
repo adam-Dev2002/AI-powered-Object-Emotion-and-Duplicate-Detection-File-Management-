@@ -17,3 +17,24 @@ __pycache__/
 # Ignore dependency directories
 node_modules/
 
+# Ignore large media files
+*.mp4
+*.zip
+*.tar.gz
+
+# Ignore IDE files
+.vscode/
+.idea/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore test result directories
+test_results/
+
+# Ignore backup files
+*~
+*.bak
+
+# Ignore other unwanted files (adjust this list as necessary)
+*.swp
