@@ -7,10 +7,10 @@ require 'login-check.php';
 
 $pageTitle = 'Trash';
 
-// Set base directory and URL for trash files
+// Set the trash directory path (local files)
 $trash_directory = '/Applications/XAMPP/xamppfiles/htdocs/TRASH';
-$trash_base_url = 'http://172.16.152.47/TRASH';
 
+// Convert file path to URL
 function convertFilePathToURL($filePath) {
     $basePath = '/Applications/XAMPP/xamppfiles/htdocs/TRASH';
     $baseURL = 'http://172.16.152.47/TRASH';
@@ -18,57 +18,72 @@ function convertFilePathToURL($filePath) {
     if (strpos($filePath, $basePath) === 0) {
         $relative_path = substr($filePath, strlen($basePath));
         $relative_path = ltrim($relative_path, '/');
-        return $baseURL . '/' . str_replace([' ', '\\'], ['%20', '/'], $relative_path); // Fix path
+        return $baseURL . '/' . str_replace(' ', '%20', $relative_path);
     }
     return false;
 }
 
-
-
-
-
-function getTrashFilesFromDB($conn, $trash_directory, $trash_base_url) {
+// Function to fetch trash files from the local directory
+function getTrashFiles($directory) {
+    $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'];
     $files = [];
-    $query = "SELECT * FROM trashfiles WHERE filename IS NOT NULL AND filename != '' ORDER BY dateupload DESC"; 
-    $stmt = $conn->prepare($query);
-    $stmt->execute();
-    $result = $stmt->get_result();
 
-    while ($row = $result->fetch_assoc()) {
-        $realFilePath = $row['real_filepath']; // Actual file location
-        $fileUrl = convertFilePathToURL($realFilePath); // Convert to valid web URL
+    if (!is_dir($directory)) {
+        return [];
+    }
 
-        // ✅ Only add if the file **exists** and is **not empty**
-        if (file_exists($realFilePath) && filesize($realFilePath) > 0) {
+    $items = scandir($directory);
+    foreach ($items as $item) {
+        if ($item !== "." && $item !== "..") {
+            $filePath = $directory . '/' . $item;
+            $fileType = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+            if (in_array($fileType, $allowedExtensions)) {
+                $files[] = [
+                    'item_name' => $item,
+                    'filepath'  => $filePath,
+                    'filetype'  => $fileType,
+                    'timestamp' => date('Y-m-d h:i:s A', strtotime('-5 hours', filemtime($filePath))),
+                    'mtime'     => filemtime($filePath)
+                ];
+            }
+        }
+    }
+
+    return $files;
+}
+
+// Function to fetch trash files from the database
+function getTrashFilesFromDB($conn) {
+    $files = [];
+    $query = "SELECT filename, filepath, filetype, date_moved, description FROM Trash ORDER BY date_moved DESC";
+    $result = mysqli_query($conn, $query);
+
+    if ($result) {
+        while ($row = mysqli_fetch_assoc($result)) {
             $files[] = [
-                'id'            => $row['id'],
-                'filename'      => htmlspecialchars($row['filename'], ENT_QUOTES, 'UTF-8'),
-                'filepath'      => htmlspecialchars($row['filepath'], ENT_QUOTES, 'UTF-8'),
-                'real_filepath' => htmlspecialchars($row['real_filepath'], ENT_QUOTES, 'UTF-8'),
-                'filetype'      => htmlspecialchars($row['filetype'], ENT_QUOTES, 'UTF-8'),
-                'size'          => $row['size'],
-                'dateupload'    => $row['dateupload'],
-                'description'   => htmlspecialchars($row['description'] ?? '', ENT_QUOTES, 'UTF-8'),
-                'timestamp'     => date('Y-m-d h:i:s A', strtotime($row['dateupload'] ?? 'now')),
-                'mtime'         => strtotime($row['dateupload'] ?? 'now'),
-                'thumbnail'     => $fileUrl // ✅ Ensure correct image preview
+                'item_name'   => $row['filename'],
+                'filepath'    => $row['filepath'],
+                'filetype'    => $row['filetype'],
+                'timestamp'   => date('Y-m-d h:i:s A', strtotime($row['date_moved'])),
+                'mtime'       => strtotime($row['date_moved']),
+                'description' => $row['description']
             ];
         }
     }
     return $files;
 }
 
+// Get trash files from both sources
+$filesFromDB    = getTrashFilesFromDB($conn);
+$filesFromLocal = getTrashFiles($trash_directory);
 
+$trashFiles = array_merge($filesFromDB, $filesFromLocal);
 
-// Get trash files from the database ONLY
-$trashFiles = getTrashFilesFromDB($conn, $trash_directory, $trash_base_url);
-
-// Sort by newest files first
+// Sort merged array by mtime (newest first)
 usort($trashFiles, function($a, $b) {
     return $b['mtime'] - $a['mtime'];
 });
-
-
 ?>
 
 <!DOCTYPE html>
@@ -328,58 +343,96 @@ usort($trashFiles, function($a, $b) {
 
     <div id="fileContainer" class="table-responsive">
         <table class="table table-hover table-striped" id="fileTable">
-        <thead>
-    <tr>
-        <th><input type="checkbox" id="selectAll"></th> <!-- ✅ 1st Column -->
-        <th>Thumbnail</th> <!-- ✅ 2nd Column -->
-        <th>File Name</th> <!-- ✅ 3rd Column -->
-        <th>Filepath</th> <!-- ✅ 4th Column -->
-        <th>Type</th> <!-- ✅ 5th Column -->
-        <th>Timestamp</th> <!-- ✅ 6th Column -->
-        <th>Action</th> <!-- ✅ 7th Column -->
-    </tr>
-</thead>
-
-<tbody>
-<?php foreach ($trashFiles as $index => $file): ?>
-    <tr data-path="<?php echo $file['filepath']; ?>">
-        <td><input type="checkbox" class="file-checkbox" value="<?php echo $file['filepath']; ?>"></td>
-        <td>
-            <?php if (!empty($file['thumbnail'])): ?>
-                <img src="<?php echo $file['thumbnail']; ?>" 
-                     alt="Thumbnail" 
-                     class="thumbnail"
-                     style="width: 40px; height: 40px; object-fit: cover; cursor: pointer;"
-                     onclick="openPreview('<?php echo $file['thumbnail']; ?>', '<?php echo $file['filetype']; ?>')">
-            <?php else: ?>
-                <span>No Preview</span>
-            <?php endif; ?>
-        </td>
-        <td>
-            <a href="javascript:void(0);" 
-               class="file-folder-link"
-               data-url="<?php echo $file['thumbnail']; ?>"
-               data-type="<?php echo htmlspecialchars($file['filetype']); ?>"
-               onclick="openPreview('<?php echo $file['thumbnail']; ?>', '<?php echo htmlspecialchars($file['filetype']); ?>')">
-                <?php echo htmlspecialchars($file['filename']); ?>
-            </a>
-        </td>
-        <td><?php echo htmlspecialchars($file['filepath']); ?></td>
-        <td><?php echo htmlspecialchars($file['filetype']); ?></td>
-        <td><?php echo htmlspecialchars($file['timestamp']); ?></td>
-        <td>
-            <button class="btn btn-sm btn-danger delete-file" data-path="<?php echo $file['filepath']; ?>">
-                <i class="fas fa-trash"></i> Delete
-            </button>
-            <button class="btn btn-sm btn-warning restore-file" data-path="<?php echo $file['filepath']; ?>">
-                <i class="fas fa-undo"></i> Restore
-            </button>
-        </td>
-    </tr>
-<?php endforeach; ?>
-</tbody>
-
-
+            <thead>
+            <tr>
+                <th><input type="checkbox" id="selectAll"></th>
+                <th>Thumbnail</th>
+                <th>File Name</th>
+                <th>Filepath</th>
+                <th>Original Folder</th>
+                <th>Type</th>
+                <th>Timestamp</th>
+                <th>Action</th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($trashFiles as $index => $file): ?>
+                <?php $fileUrl = convertFilePathToURL($file['filepath']); ?>
+                <tr data-path="<?php echo $file['filepath']; ?>">
+                    <td><input type="checkbox" class="file-checkbox" value="<?php echo $file['filepath']; ?>"></td>
+                    <td>
+                        <?php
+                        if (preg_match('/\.(jpg|jpeg|png|gif)$/i', $file['filepath'])) {
+                            echo "<img src='" . htmlspecialchars($fileUrl) . "' 
+                                 alt='Thumbnail' 
+                                 class='thumbnail'
+                                 style='width: 40px; height: 40px; object-fit: cover; cursor: pointer;'
+                                 onclick=\"openPreview('" . htmlspecialchars($fileUrl) . "', '" . htmlspecialchars($file['filetype']) . "')\">";
+                        } elseif (preg_match('/\.(mp4|mov|avi)$/i', $file['filepath'])) {
+                            echo "<div class='video-thumbnail' 
+                                    style='position: relative; width: 40px; height: 40px; cursor: pointer;'
+                                    onclick=\"openPreview('" . htmlspecialchars($fileUrl) . "', '" . htmlspecialchars($file['filetype']) . "')\">
+                                    <video src='" . htmlspecialchars($fileUrl) . "' 
+                                           class='thumbnail' 
+                                           muted 
+                                           style='width: 100%; height: 100%; object-fit: cover;'>
+                                    </video>
+                                    <div class='play-button' 
+                                         style='position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                                                width: 20px; height: 20px; background: rgba(0, 0, 0, 0.5); 
+                                                border-radius: 50%; display: flex; justify-content: center; align-items: center;'>
+                                        <i class='fas fa-play' style='color: white; font-size: 12px;'></i>
+                                    </div>
+                                  </div>";
+                        } else {
+                            echo "<span>No Preview</span>";
+                        }
+                        ?>
+                    </td>
+                    <td class="file-folder-link"><?php echo htmlspecialchars($file['item_name']); ?></td>
+                    <td title="<?php echo htmlspecialchars($file['filepath']); ?>" data-bs-toggle="tooltip">
+                        <?php
+                        $fullPath = $file['filepath'];
+                        $maxLen   = 20;
+                        $shortPath = (strlen($fullPath) > $maxLen)
+                            ? substr($fullPath, 0, $maxLen) . '...'
+                            : $fullPath;
+                        ?>
+                        <span style="display:inline-block; max-width:250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            <?php echo htmlspecialchars($shortPath); ?>
+                        </span>
+                    </td>
+                    <td>
+                        <?php
+                        $desc = $file['description'] ?? '';
+                        $prefix = "Moved from ";
+                        if(strpos($desc, $prefix) === 0) {
+                            $path = trim(substr($desc, strlen($prefix)));
+                            $lastFolder = basename(dirname($path));
+                            echo htmlspecialchars($lastFolder);
+                        } else {
+                            $maxLength = 30;
+                            echo htmlspecialchars(strlen($desc) > $maxLength ? substr($desc, 0, $maxLength) . '...' : $desc);
+                        }
+                        ?>
+                    </td>
+                    <td><?php echo htmlspecialchars($file['filetype']); ?></td>
+                    <td data-order="<?php echo $file['mtime']; ?>">
+                        <?php echo htmlspecialchars($file['timestamp']); ?>
+                    </td>
+                    <td>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-sm btn-danger delete-file" data-path="<?php echo $file['filepath']; ?>">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                            <button class="btn btn-sm btn-warning restore-file" data-path="<?php echo $file['filepath']; ?>">
+                                <i class="fas fa-undo"></i> Restore
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
 

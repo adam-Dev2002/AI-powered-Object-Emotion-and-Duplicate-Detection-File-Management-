@@ -3,10 +3,10 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 include 'config.php';
 
-// Updated base directory to reflect the new trash folder location
-$base_directory = '/Applications/XAMPP/xamppfiles/htdocs/TRASH/';
+// Define the physical trash directory
+$trash_directory = '/Applications/XAMPP/xamppfiles/htdocs/TRASH/';
 
-// Function to adjust file path if necessary
+// Adjust file path if it has "http://localhost/" prefix
 function adjustFilePath($filePath) {
     if (strpos($filePath, "http://localhost/") !== false) {
         return str_replace("http://localhost/", "/Applications/XAMPP/xamppfiles/htdocs/", $filePath);
@@ -17,69 +17,71 @@ function adjustFilePath($filePath) {
 $data = json_decode(file_get_contents('php://input'), true);
 
 if (isset($data['filepath']) && isset($data['fileName'])) {
-    $filePath = adjustFilePath(trim($data['filepath']));
-    $fileName = trim($data['fileName']);
+    // Original path from the 'files' table
+    $originalFilePath = adjustFilePath(trim($data['filepath']));
+    $fileName         = trim($data['fileName']);
 
-    // Ensure trash directory exists
-    if (!is_dir($base_directory)) {
-        mkdir($base_directory, 0777, true);
+    // Ensure the /TRASH/ directory exists
+    if (!is_dir($trash_directory)) {
+        mkdir($trash_directory, 0777, true);
     }
 
-    $safeFileName = basename($fileName);
-    $newPath = rtrim($base_directory, '/') . '/' . $safeFileName;
+    // Construct the new physical path inside /TRASH/
+    $safeFileName = basename($fileName); // e.g. trashsample.jpeg
+    $newPath      = rtrim($trash_directory, '/') . '/' . $safeFileName;
 
-    if (file_exists($filePath)) {
-        // If a file with the same name already exists in TRASH, append timestamp
+    // Check if the original file actually exists
+    if (file_exists($originalFilePath)) {
+        // If a file with the same name already exists in /TRASH/, append timestamp
         if (file_exists($newPath)) {
             $fileInfo = pathinfo($safeFileName);
-            $newPath = rtrim($base_directory, '/') . '/'
+            $newPath  = rtrim($trash_directory, '/') . '/'
                 . $fileInfo['filename'] . '_' . time()
                 . '.' . $fileInfo['extension'];
         }
 
-        // Attempt to move the file
-        if (rename($filePath, $newPath)) {
-            // 1) Insert record into trash table
-            //    (Make sure your trash table has these columns: filename, filepath, filehash, filetype, size, date_moved, description)
-            $stmtTrash = $conn->prepare("
-                INSERT INTO trash (filename, filepath, filehash, filetype, size, date_moved, description)
-                VALUES (?, ?, ?, ?, ?, NOW(), ?)
+        // Physically move the file from original path to the /TRASH/ path
+        if (rename($originalFilePath, $newPath)) {
+            // 1) Transfer metadata from `files` to `trashfiles`
+            //    This keeps the same filepath (the original) in `trashfiles.filepath`
+            $stmtMove = $conn->prepare("
+                INSERT INTO trashfiles 
+                SELECT * 
+                FROM files 
+                WHERE filepath = ?
             ");
-            if (!$stmtTrash) {
+            if (!$stmtMove) {
                 echo json_encode(['status' => 'error', 'message' => 'Prepare failed: ' . $conn->error]);
                 exit;
             }
-
-            // Example data
-            $filename    = basename($newPath);                       // The name in TRASH
-            $filepath    = $newPath;                                 // The new path in TRASH
-            $filehash    = md5_file($newPath);                      // Or some other hashing logic
-            $filetype    = strtolower(pathinfo($newPath, PATHINFO_EXTENSION));
-            $size        = filesize($newPath);                      // File size in bytes
-            $description = 'Moved from ' . $filePath;               // Any extra info
-
-            $stmtTrash->bind_param("ssssis",
-                $filename,
-                $filepath,
-                $filehash,
-                $filetype,
-                $size,
-                $description
-            );
-            if (!$stmtTrash->execute()) {
-                echo json_encode(['status' => 'error', 'message' => 'Insert failed: ' . $stmtTrash->error]);
+            $stmtMove->bind_param("s", $originalFilePath);
+            if (!$stmtMove->execute()) {
+                echo json_encode(['status' => 'error', 'message' => 'Insert failed: ' . $stmtMove->error]);
                 exit;
             }
-            $stmtTrash->close();
+            $stmtMove->close();
 
-            // 2) Remove record from the original files table
-            $sql = "DELETE FROM files WHERE filepath = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("s", $filePath);
-            $stmt->execute();
-            $stmt->close();
+            // 2) Update the `real_filepath` column in `trashfiles` to the new physical trash location
+            //    but keep `filepath` as the original path
+            $stmtUpdate = $conn->prepare("
+                UPDATE trashfiles 
+                SET real_filepath = ? 
+                WHERE filepath = ?
+            ");
+            $stmtUpdate->bind_param("ss", $newPath, $originalFilePath);
+            $stmtUpdate->execute();
+            $stmtUpdate->close();
 
-            // 3) Return success response
+            // 3) Delete the record from `files`
+            $stmtDelete = $conn->prepare("
+                DELETE FROM files 
+                WHERE filepath = ?
+            ");
+            $stmtDelete->bind_param("s", $originalFilePath);
+            $stmtDelete->execute();
+            $stmtDelete->close();
+
+            // Success response
             echo json_encode([
                 'status'    => 'success',
                 'message'   => 'File moved to trash successfully.',
