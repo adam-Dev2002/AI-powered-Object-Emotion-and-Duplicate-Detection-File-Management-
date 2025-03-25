@@ -32,7 +32,7 @@ Below is a summary of the key features from the Ultralytics YOLOv11 documentatio
 - **Multi-Task Capability:** Integrates with various AI tasks, making it versatile for diverse applications.
 
 For full details, please visit the [Ultralytics YOLOv11 documentation](https://docs.ultralytics.com/models/yolo11/#key-features).  
-*Note: Due to copyright restrictions, the above is a summarized version of the original documentation.*
+
 
 ## Installation and Configuration
 
