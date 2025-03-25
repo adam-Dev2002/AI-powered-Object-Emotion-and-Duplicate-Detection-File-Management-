@@ -1,5 +1,7 @@
 # Greyhound - Hub Admin Documentation
 
+<!--  "FINAL VIDEO (1).mp4" -->
+
 Greyhound is a comprehensive hub admin project that integrates file management with advanced AI capabilities including object detection, emotion analysis, and duplicate detection powered by YOLO AI.
 
 ## Table of Contents
