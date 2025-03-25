@@ -1,93 +1,87 @@
-# greyhound-admin-2025
+# Greyhound - Hub Admin Documentation
 
+Greyhound is a comprehensive hub admin project that integrates file management with advanced AI capabilities including object detection, emotion analysis, and duplicate detection powered by YOLO AI.
 
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [YOLO AI Key Features (Summary)](#yolo-ai-key-features-summary)
+- [Installation and Configuration](#installation-and-configuration)
+- [Usage](#usage)
+- [Additional Notes](#additional-notes)
 
-## Getting started
+## Overview
+Greyhound provides a robust administrative platform that facilitates file management and leverages cutting-edge AI technology for real-time object detection, emotion recognition, and duplicate file detection. The project is designed to be customizable and scalable for various deployment environments.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Features
+- **File Management:** Efficient organization, storage, and retrieval of files.
+- **AI Object Detection:** Real-time object detection using YOLO AI.
+- **Emotion Detection:** Analyze emotional expressions in images and videos.
+- **Duplicate Detection:** Identify and manage duplicate files.
+- **Customizable & Scalable:** Easily configurable to suit your specific requirements.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## YOLO AI Key Features (Summary)
+Below is a summary of the key features from the Ultralytics YOLOv11 documentation:
+- **High Accuracy & Speed:** Delivers state-of-the-art performance for real-time object detection tasks.
+- **Efficient Architecture:** Optimized model design that enables faster inference with lower computational overhead.
+- **Scalability:** Supports multi-scale detection and can handle multiple objects seamlessly.
+- **Flexible Training:** Offers customizable training parameters and advanced data augmentation techniques.
+- **Advanced Post-Processing:** Implements enhancements for improved localization and classification precision.
+- **Multi-Task Capability:** Integrates with various AI tasks, making it versatile for diverse applications.
 
-## Add your files
+For full details, please visit the [Ultralytics YOLOv11 documentation](https://docs.ultralytics.com/models/yolo11/#key-features).  
+*Note: Due to copyright restrictions, the above is a summarized version of the original documentation.*
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+## Installation and Configuration
 
-```
-cd existing_repo
-git remote add origin https://gitlab.com/4th-year/greyhound-admin-2025.git
-git branch -M main
-git push -uf origin main
-```
+1. **Update Credentials:**  
+   - Open the `config.php` file and update it with your credentials.
 
-## Integrate with your tools
+2. **Set Directory Path:**  
+   - Change the directory path to your desired location. For example:  
+     `/Applications/XAMPP/xamppfiles/htdocs/testcreative`
 
-- [ ] [Set up project integrations](https://gitlab.com/4th-year/greyhound-admin-2025/-/settings/integrations)
+3. **Set Permissions:**  
+   - Ensure the web server has full access permission on your directory by running:  
+     ```bash
+     chmod -R 775 /Applications/XAMPP/xamppfiles/htdocs/testcreative/
+     ```
 
-## Collaborate with your team
+4. **Python Setup:**  
+   - Install Python 3.10.
+   - Install required packages using `requirements.txt`.  
+     If errors persist, install the Python packages individually.
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+5. **Sync File Configuration:**  
+   - Update the location of `sync_file.php` to point to your Python 3.10 executable location.
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+- **File Management:**  
+  Use the provided interface to upload, organize, and manage your files.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- **AI Features:**  
+  Leverage the integrated YOLO AI capabilities for:
+  - **Object Detection:** Detect and classify objects in images and videos.
+  - **Emotion Detection:** Analyze emotional expressions.
+  - **Duplicate Detection:** Identify and manage duplicate files.
+  
+  Configure each AI task as needed within your project settings.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## Additional Notes
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+- **Pre-Deployment:**  
+  Ensure that all configuration settings (credentials, file paths, permissions) are updated and tested before running the application.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+- **Troubleshooting:**  
+  If you encounter issues:
+  - Verify that the web server has the correct permissions.
+  - Double-check that Python 3.10 and all necessary packages are installed.
+  - Review the paths and configurations in both `config.php` and `sync_file.php`.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+- **Further Documentation:**  
+  For more detailed information, refer to the official documentation for PHP, Python, and YOLO AI libraries.
 
-## License
-For open source projects, say how it is licensed.
+---
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+This README provides a comprehensive guide to setting up and running the Greyhound - Hub Admin project. For any additional details or advanced configurations, please consult the respective official documentation.
