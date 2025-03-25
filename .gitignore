@@ -22,6 +22,9 @@ node_modules/
 *.zip
 *.tar.gz
 
+# Ignore downloads folder containing large files
+downloads/
+
 # Ignore IDE files
 .vscode/
 .idea/
