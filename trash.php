@@ -367,10 +367,11 @@ usort($trashFiles, function($a, $b) {
             <tbody>
             <?php foreach ($trashFiles as $index => $file): ?>
                 <?php $shortFilepath = shortenPath($file['filepath'], 50); ?>
-                <tr data-path="<?php echo htmlspecialchars($file['filepath']); ?>">
+                <!-- Use the real_filepath for data-path and checkbox value -->
+                <tr data-path="<?php echo htmlspecialchars($file['real_filepath']); ?>">
                     <td>
                         <input type="checkbox" class="file-checkbox"
-                               value="<?php echo htmlspecialchars($file['filepath']); ?>">
+                               value="<?php echo htmlspecialchars($file['real_filepath']); ?>">
                     </td>
                     <td>
                         <?php if (!empty($file['thumbnail'])): ?>
@@ -378,8 +379,7 @@ usort($trashFiles, function($a, $b) {
                                  alt="Thumbnail"
                                  class="thumbnail"
                                  style="width: 40px; height: 40px; object-fit: cover; cursor: pointer;"
-                                 onclick="openPreview('<?php echo htmlspecialchars($file['thumbnail']); ?>',
-                                         '<?php echo htmlspecialchars($file['filetype']); ?>')">
+                                 onclick="openPreview('<?php echo htmlspecialchars($file['thumbnail']); ?>', '<?php echo htmlspecialchars($file['filetype']); ?>')">
                         <?php else: ?>
                             <span>No Preview</span>
                         <?php endif; ?>
@@ -389,20 +389,20 @@ usort($trashFiles, function($a, $b) {
                         <span><?php echo htmlspecialchars($file['filename']); ?></span>
                     </td>
                     <td>
-                        <!-- Display shortened file path with a tooltip showing the full path -->
-                        <span data-bs-toggle="tooltip"
-                              title="<?php echo htmlspecialchars($file['filepath']); ?>">
-                            <?php echo htmlspecialchars($shortFilepath); ?>
-                        </span>
+                        <!-- Display shortened file path with a tooltip showing the full original path -->
+                        <span data-bs-toggle="tooltip" title="<?php echo htmlspecialchars($file['filepath']); ?>">
+                    <?php echo htmlspecialchars($shortFilepath); ?>
+                </span>
                     </td>
                     <td><?php echo htmlspecialchars($file['filetype'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($file['timestamp'] ?? 'N/A'); ?></td>
                     <td>
+                        <!-- Delete button uses real_filepath -->
                         <button class="btn btn-sm btn-danger delete-file"
-                                data-path="<?php echo htmlspecialchars($file['filepath']); ?>">
+                                data-path="<?php echo htmlspecialchars($file['real_filepath']); ?>">
                             <i class="fas fa-trash"></i> Delete
                         </button>
-                        <!-- Use a light-green button (btn-success) for restore. We pass both the real (TRASH) and original path -->
+                        <!-- Restore button: data-realpath is the TRASH file location, data-originalpath is the original location -->
                         <button class="btn btn-sm btn-success restore-file"
                                 data-realpath="<?php echo htmlspecialchars($file['real_filepath']); ?>"
                                 data-originalpath="<?php echo htmlspecialchars($file['filepath']); ?>">
@@ -412,6 +412,7 @@ usort($trashFiles, function($a, $b) {
                 </tr>
             <?php endforeach; ?>
             </tbody>
+
         </table>
     </div>
 
@@ -432,7 +433,8 @@ usort($trashFiles, function($a, $b) {
         <?php foreach ($trashFiles as $file): ?>
             <?php
             // Convert the file’s TRASH path to a valid URL for <img> or <video>.
-            $fileURL  = convertFilePathToURL($file['filepath']);
+            $fileURL = convertFilePathToURL($file['real_filepath']);
+
             // Ensure we have a lowercased extension to check.
             $ext      = strtolower(pathinfo($file['filename'], PATHINFO_EXTENSION));
             $fileName = htmlspecialchars($file['filename'], ENT_QUOTES);
@@ -481,9 +483,10 @@ usort($trashFiles, function($a, $b) {
 <script>
     $(document).ready(function () {
         // Bulk Restore: Trigger when the "Restore Selected" button is clicked
+        // Bulk Restore: Trigger when the "Restore Selected" button is clicked
         $('#restoreSelectedBtn').click(function () {
             let selectedFiles = $('.file-checkbox:checked').map(function () {
-                return $(this).val();
+                return $(this).val(); // These should be the TRASH paths (real_filepath)
             }).get();
 
             if (selectedFiles.length === 0) {
@@ -491,13 +494,13 @@ usort($trashFiles, function($a, $b) {
                 return;
             }
 
-            // Extract just filenames for display in the confirmation modal
+            // Extract just the filenames for display
             let filenamesForDisplay = selectedFiles.map(filePath => filePath.split('/').pop()).join("<br>");
 
             // Open confirmation modal with the list of files to restore
             $("#confirmationModalLabel").html("Confirm Bulk Restore");
             $("#confirmationModalBody").html(`Are you sure you want to restore these files?<br><br>
-            <strong>${filenamesForDisplay}</strong>`);
+        <strong>${filenamesForDisplay}</strong>`);
             $("#confirmationModal").modal("show");
 
             // Set confirm action for bulk restore
@@ -507,12 +510,11 @@ usort($trashFiles, function($a, $b) {
             });
         });
 
-        // Function to perform bulk restore via AJAX using restoreFile.php
         function performBulkRestore(selectedFiles) {
             $.ajax({
                 url: 'restoreFile.php',
                 type: 'POST',
-                data: JSON.stringify({ filepath: selectedFiles }),
+                data: JSON.stringify({ filepath: selectedFiles }), // Passing an array of TRASH paths
                 contentType: 'application/json',
                 dataType: 'json',
                 success: function (response) {
@@ -522,7 +524,7 @@ usort($trashFiles, function($a, $b) {
                         selectedFiles.forEach(filePath => {
                             $(`input.file-checkbox[value="${filePath}"]`).closest('tr').remove();
                         });
-                        // Optionally, uncheck the "Select All" checkbox
+                        // Uncheck "Select All" after restore
                         $('#selectAll').prop('checked', false);
                     } else {
                         showErrorModal("Error restoring files: " + response.message);
@@ -535,6 +537,7 @@ usort($trashFiles, function($a, $b) {
             });
         }
 
+
         // (Your existing code for bulk delete, individual delete, restore, tooltips, etc. remains intact.)
     });
 
@@ -545,20 +548,19 @@ usort($trashFiles, function($a, $b) {
             // Attach click listeners to all .restore-file buttons
             document.querySelectorAll('.restore-file').forEach(button => {
                 button.addEventListener('click', function() {
-                    // Read the file's trash path from the data attribute
-                    const filePath = this.getAttribute('data-path');
-                    console.log("Restore button clicked. File path:", filePath);
-
-                    if (!filePath) {
-                        console.error("Error: File path is missing.");
-                        document.getElementById('errorModalBody').textContent = "Error: File path is missing.";
+                    // Read the TRASH file path from data-realpath and the original path for display
+                    const trashPath = this.getAttribute('data-realpath');
+                    const originalPath = this.getAttribute('data-originalpath');
+                    if (!trashPath) {
+                        document.getElementById('errorModalBody').textContent = "Error: Trash file path is missing.";
                         new bootstrap.Modal(document.getElementById('errorModal')).show();
                         return;
                     }
-
-                    // Extract only the filename for display
-                    const filename = filePath.split('/').pop();
-                    console.log("Extracted filename:", filename);
+                    // Use originalPath to extract the filename for display
+                    const filename = originalPath.split('/').pop();
+                    console.log("Restore button clicked. TRASH path:", trashPath);
+                    console.log("Original path:", originalPath);
+                    console.log("Filename:", filename);
 
                     // Update confirmation modal content
                     document.getElementById('confirmationModalLabel').textContent = "Confirm Restore";
@@ -575,19 +577,18 @@ usort($trashFiles, function($a, $b) {
                     // Remove any existing click handlers on the confirmation button to avoid duplicates
                     const confirmBtn = document.getElementById('confirmActionBtn');
                     confirmBtn.replaceWith(confirmBtn.cloneNode(true));
-                    // Now re-select the button reference
                     const newConfirmBtn = document.getElementById('confirmActionBtn');
 
-                    // Attach new click handler for restoring file
-                    newConfirmBtn.addEventListener('click', async function restoreHandler() {
-                        console.log("Restore confirmed for file:", filePath);
-                        confirmationModal.hide(); // Hide modal immediately
+                    // Attach a one‑time click handler for restoring the file
+                    newConfirmBtn.addEventListener('click', async function() {
+                        console.log("Restore confirmed for TRASH path:", trashPath);
+                        confirmationModal.hide(); // Hide modal
 
                         try {
                             const response = await fetch('restoreFile.php', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ filepath: filePath })
+                                body: JSON.stringify({ filepath: trashPath })
                             });
                             console.log("Restore fetch response:", response);
                             const result = await response.json();
@@ -603,7 +604,8 @@ usort($trashFiles, function($a, $b) {
                             }
                         } catch (error) {
                             console.error("Error restoring file:", error);
-                            document.getElementById('errorModalBody').textContent = "An unexpected error occurred.";
+                            document.getElementById('errorModalBody').textContent =
+                                "An unexpected error occurred.";
                             new bootstrap.Modal(document.getElementById('errorModal')).show();
                         }
                     }, { once: true });
@@ -617,48 +619,83 @@ usort($trashFiles, function($a, $b) {
 
     <script>
 
-    function openPreview(fileUrl, fileType) {
-        const overlay = document.getElementById('file-preview-overlay');
-        const content = document.getElementById('file-preview-content');
-        content.innerHTML = `<img src="${fileUrl}" style="width: 100%; max-height: 80vh; object-fit: contain;">`;
-        overlay.style.display = 'flex';
-    }
-</script>
-<script>
-    $(document).ready(function () {
-        let currentFiles = []; // Store the list of files (url, type)
-        let currentIndex = 0;  // Track the current previewed file
+        function openPreview(fileUrl, fileType) {
+            console.log("openPreview called with fileUrl:", fileUrl, "and fileType:", fileType);
+            const overlay = document.getElementById('file-preview-overlay');
+            const content = document.getElementById('file-preview-content');
 
-        // Function to open the modal and preview the file
+            // Clear any previous content
+            content.innerHTML = "";
+
+            if (!fileUrl) {
+                console.error("Error: fileUrl is empty.");
+                content.innerHTML = "<p>Error: No preview available.</p>";
+            } else {
+                // For images, create an <img> element with an onerror fallback
+                if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
+                    const img = document.createElement("img");
+                    img.src = fileUrl;
+                    img.style.width = "100%";
+                    img.style.maxHeight = "80vh";
+                    img.style.objectFit = "contain";
+                    // Fallback image if error occurs (adjust path as needed)
+                    img.onerror = function() {
+                        this.src = 'assets/img/no-preview.png';
+                    };
+                    content.appendChild(img);
+                }
+                // For video files
+                else if (fileType.match(/(mp4|mov|avi)$/i)) {
+                    const video = document.createElement("video");
+                    video.src = fileUrl;
+                    video.controls = true;
+                    video.style.width = "100%";
+                    video.style.maxHeight = "80vh";
+                    video.style.objectFit = "contain";
+                    content.appendChild(video);
+                }
+                // For unsupported types
+                else {
+                    content.innerHTML = "<p>Preview not available for this file type.</p>";
+                }
+            }
+
+            // Show the overlay
+            overlay.style.display = "flex";
+        }
+
+</script>
+    <script>
+        let currentFiles = []; // Global array to store file objects for preview
+        let currentIndex = 0;  // Global index of the currently previewed file
+
+        // Function to open the preview modal with the given file URL and type
         function openModal(fileUrl, fileType) {
             const overlay = $("#file-preview-overlay");
             const content = $("#file-preview-content");
             content.html(""); // Clear previous content
 
-            // Handle different file types
-            if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
+            if (!fileUrl) {
+                content.html("<p>No preview available.</p>");
+            } else if (fileType.match(/(jpg|jpeg|png|gif)$/i)) {
                 content.append(`<img src="${fileUrl}" class="preview-media" style="width: 100%; max-height: 80vh; object-fit: contain;">`);
             } else if (fileType.match(/(mp4|mov|avi)$/i)) {
-                content.append(`<video src="${fileUrl}" controls class="preview-media" style="width: 100%; max-height: 80vh;"></video>`);
+                content.append(`<video src="${fileUrl}" controls class="preview-media" style="width: 100%; max-height: 80vh; object-fit: contain;"></video>`);
             } else {
-                content.append(`<p>Preview not available for this file type.</p>`);
+                content.append("<p>Preview not available for this file type.</p>");
             }
-
             overlay.fadeIn();
         }
 
-        // Function to open a file and initialize navigation
+        // Function to initialize preview with the collected files
         function initializeFilePreview(files, startIndex) {
             if (!files.length) return;
-
             currentFiles = files;
             currentIndex = startIndex;
-
-            // Open the first file in the preview
             openModal(currentFiles[currentIndex].url, currentFiles[currentIndex].type);
         }
 
-        // Function to navigate files
+        // Navigation function for preview modal
         function navigateFile(direction) {
             if (direction === "next" && currentIndex < currentFiles.length - 1) {
                 currentIndex++;
@@ -668,67 +705,89 @@ usort($trashFiles, function($a, $b) {
                 console.log("Reached the limit.");
                 return;
             }
-
             openModal(currentFiles[currentIndex].url, currentFiles[currentIndex].type);
         }
 
-        // Event listeners for navigation
-        $("#prev-btn").on("click", function () {
-            navigateFile("prev");
-        });
-
-        $("#next-btn").on("click", function () {
-            navigateFile("next");
-        });
-
-        $("#close-preview-btn").on("click", function () {
-            $("#file-preview-overlay").fadeOut();
-        });
-
-        // **✅ FIX: Collect files from both List View and Grid View ✅**
+        // Function to collect files for preview from both Grid and List views
         function collectFiles() {
-            currentFiles = []; // Reset array to prevent duplicates
+            currentFiles = []; // Reset the array
 
-            // **Collect files from Grid View**
+            // Collect files from Grid View
             $(".grid-item .thumbnail").each(function (index) {
                 const fileUrl = $(this).attr("src");
                 const fileType = $(this).closest(".grid-item").attr("data-type");
-
+                // Only add if not already added
                 if (!currentFiles.some(file => file.url === fileUrl)) {
                     currentFiles.push({ url: fileUrl, type: fileType });
                 }
-
+                // Bind click event for grid view thumbnails
                 $(this).off("click").on("click", function () {
                     initializeFilePreview(currentFiles, index);
                 });
             });
 
-            // **Collect files from List View (Table View)**
+            // Collect files from List View (Table View)
+            // Note: In the table, our columns are:
+            // 1: checkbox, 2: thumbnail, 3: file name, 4: file path, 5: type, 6: timestamp, 7: action.
             $("#fileTable .thumbnail").each(function (index) {
                 const fileUrl = $(this).attr("src");
-                const fileType = $(this).closest("tr").find("td:nth-child(4)").text().trim(); // Get file type from table
-
+                // Get file type from the 5th column of the table row
+                const fileType = $(this).closest("tr").find("td:nth-child(5)").text().trim();
                 if (!currentFiles.some(file => file.url === fileUrl)) {
                     currentFiles.push({ url: fileUrl, type: fileType });
                 }
-
+                // Bind click event for list view thumbnails
                 $(this).off("click").on("click", function () {
                     initializeFilePreview(currentFiles, index);
                 });
             });
+
+            console.log("Collected files for preview:", currentFiles);
         }
 
-        // Ensure files are collected when switching views
-        $("#list-view-btn, #grid-view-btn").click(function () {
+        // Bind navigation buttons
+        $(document).ready(function () {
+            $("#prev-btn").on("click", function () {
+                navigateFile("prev");
+            });
+            $("#next-btn").on("click", function () {
+                navigateFile("next");
+            });
+            $("#close-preview-btn").on("click", function () {
+                $("#file-preview-overlay").fadeOut();
+            });
+
+            // Initial file collection
             collectFiles();
+
+            // Re-collect files when switching views
+            $("#list-view-btn, #grid-view-btn").on("click", function () {
+                collectFiles();
+            });
+
+            $(document).keydown(function(e) {
+                // Check if the preview overlay is visible
+                if ($("#file-preview-overlay").is(":visible")) {
+                    // Left arrow key (37)
+                    if (e.which === 37) {
+                        navigateFile("prev");
+                        e.preventDefault();
+                    }
+                    // Right arrow key (39)
+                    else if (e.which === 39) {
+                        navigateFile("next");
+                        e.preventDefault();
+                    }
+                    // Escape key (27) to close preview
+                    else if (e.which === 27) {
+                        $("#file-preview-overlay").fadeOut();
+                        e.preventDefault();
+                    }
+                }
+            });
+
         });
-
-        // Initial file collection
-        collectFiles();
-    });
-
-
-</script>
+    </script>
 
 
 <script>
